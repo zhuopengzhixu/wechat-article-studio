@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公众号文章可视化编辑器 · 有一云风格</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  body { background: #f4f5f7; color: #333; display: flex; flex-direction: column; }
+
+  /* 顶栏 */
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #fff; border-bottom: 1px solid #e6e8eb; flex-wrap: wrap; }
+  .topbar h1 { font-size: 15px; font-weight: 700; color: #1e7b6b; margin-right: 8px; white-space: nowrap; }
+  .topbar .field { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #666; }
+  .topbar select, .topbar input[type=text] { padding: 6px 8px; border: 1px solid #d9dde1; border-radius: 6px; font-size: 13px; }
+  .topbar input[type=text] { width: 180px; }
+  .btn { padding: 7px 14px; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 600; }
+  .btn-primary { background: #1e7b6b; color: #fff; }
+  .btn-primary:hover { background: #155c50; }
+  .btn-smart { background: #C07A2B; color: #fff; }
+  .btn-smart:hover { background: #a9651f; }
+  .btn-ghost { background: #eef1f3; color: #444; }
+  .btn-ghost:hover { background: #e2e6ea; }
+  .spacer { flex: 1; }
+
+  /* 三栏布局 */
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .panel-l, .panel-r { width: 240px; background: #fff; overflow-y: auto; border-right: 1px solid #e6e8eb; }
+  .panel-r { border-right: none; border-left: 1px solid #e6e8eb; }
+  .canvas-wrap { flex: 1; overflow-y: auto; padding: 22px; display: flex; justify-content: center; }
+
+  .panel-title { font-size: 12px; font-weight: 700; color: #999; padding: 14px 14px 8px; letter-spacing: .5px; }
+  .comp-group { margin-bottom: 6px; }
+  .comp-group-h { font-size: 11px; color: #aaa; padding: 8px 14px 4px; }
+  .comp-btn { display: flex; align-items: center; gap: 8px; width: calc(100% - 16px); margin: 4px 8px; padding: 9px 10px; background: #f7f9fa; border: 1px solid #ecedef; border-radius: 8px; font-size: 13px; color: #444; cursor: pointer; text-align: left; }
+  .comp-btn:hover { background: #eaf4f1; border-color: #1e7b6b; color: #155c50; }
+  .comp-btn .ico { font-size: 15px; }
+
+  /* 画布（手机预览） */
+  .phone { width: 380px; min-height: 600px; background: #fff; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,.08); padding: 16px; }
+  .phone-empty { color: #bbb; text-align: center; padding: 80px 20px; font-size: 13px; line-height: 1.8; }
+  .block { position: relative; }
+  .block-tools { position: absolute; right: 2px; top: 2px; display: none; gap: 4px; z-index: 5; }
+  .block:hover .block-tools { display: flex; }
+  .block-tools button { width: 24px; height: 24px; border: none; border-radius: 5px; background: rgba(30,123,107,.92); color: #fff; font-size: 12px; cursor: pointer; line-height: 1; }
+  .block-tools button.del { background: rgba(217,83,79,.92); }
+  .block-tools button:hover { filter: brightness(1.1); }
+  .block [contenteditable="true"] { outline: none; }
+  .block [contenteditable="true"]:focus { background: rgba(30,123,107,.06); border-radius: 4px; box-shadow: 0 0 0 2px rgba(30,123,107,.25); }
+
+  /* 右栏 */
+  .theme-card { margin: 8px 12px; padding: 10px; border: 1px solid #ececec; border-radius: 8px; cursor: pointer; }
+  .theme-card.active { border-color: #1e7b6b; box-shadow: 0 0 0 2px rgba(30,123,107,.15); }
+  .theme-card .row { display: flex; gap: 6px; margin-top: 8px; }
+  .theme-card .sw { width: 22px; height: 22px; border-radius: 5px; }
+  .theme-card .name { font-size: 13px; font-weight: 600; }
+  .theme-card .desc { font-size: 11px; color: #999; margin-top: 2px; }
+  .code-box { margin: 8px 12px; background: #2b2b2b; color: #e6e6e6; border-radius: 8px; padding: 10px; font-family: Consolas, Menlo, monospace; font-size: 11px; line-height: 1.5; max-height: 280px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+  .tip { font-size: 11px; color: #999; padding: 6px 14px 14px; line-height: 1.7; }
+  .hint { background:#fff8e1;border:1px solid #ffe0a3;color:#9a6b00;font-size:12px;padding:8px 12px;margin:8px 12px;border-radius:8px;line-height:1.6;}
+  .wordcount { font-size:12px;color:#888;background:#f0f2f4;padding:5px 10px;border-radius:6px;white-space:nowrap; }
+  /* 智能排版浮层 */
+  .modal-mask { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal-mask.show { display:flex; }
+  .modal { width:440px; max-width:92vw; max-height:90vh; overflow:auto; background:#fff; border-radius:14px; padding:22px 24px; box-shadow:0 12px 40px rgba(0,0,0,.25); }
+  .modal h3 { margin:0 0 4px; font-size:18px; color:#1E7B6B; }
+  .modal .sub { margin:0 0 6px; font-size:12px; color:#999; line-height:1.6; }
+  .modal label { display:block; font-size:13px; color:#444; margin:14px 0 5px; }
+  .modal input, .modal textarea, .modal select { width:100%; box-sizing:border-box; padding:9px 11px; border:1px solid #d8dee2; border-radius:8px; font-size:14px; font-family:inherit; background:#fff; }
+  .modal textarea { height:62px; resize:vertical; }
+  .modal .row { display:flex; gap:10px; }
+  .modal .row > div { flex:1; min-width:0; }
+  .modal .acts { display:flex; gap:10px; margin-top:20px; }
+  .modal .acts button { flex:1; padding:11px; border:none; border-radius:9px; font-size:15px; cursor:pointer; }
+  .modal .acts .gen { background:#1E7B6B; color:#fff; font-weight:bold; }
+  .modal .acts .gen:hover { background:#155C50; }
+  .modal .acts .cancel { background:#f0f2f4; color:#555; }
+  .modal .acts .dl { background:#1E7B6B; color:#fff; font-weight:bold; }
+  .modal .acts .dl:hover { background:#155C50; }
+  .modal .code-box { background:#f6f8f9; border:1px solid #e3e7ea; border-radius:8px; padding:10px 12px; font-size:11px; line-height:1.5; max-height:44vh; overflow:auto; white-space:pre-wrap; word-break:break-all; color:#444; }
+  .toast { position:fixed; left:50%; bottom:42px; transform:translateX(-50%) translateY(20px); background:rgba(28,38,33,.94); color:#fff; padding:11px 22px; border-radius:24px; font-size:14px; z-index:99; opacity:0; transition:.3s; pointer-events:none; white-space:nowrap; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* 选区格式工具条 */
+  .sel-bar { position:fixed; z-index:60; display:none; align-items:center; gap:6px; background:#2b2f33; color:#fff; padding:6px 8px; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.3); font-size:13px; }
+  .sel-bar.show { display:flex; }
+  .sel-bar select { background:#3a3f44; color:#fff; border:1px solid #555; border-radius:6px; padding:4px 4px; font-size:13px; }
+  .sel-bar button { background:#3a3f44; color:#fff; border:none; border-radius:6px; padding:5px 9px; cursor:pointer; font-size:13px; }
+  .sel-bar button:hover { background:#4a5056; }
+  .sel-palette { position:fixed; z-index:61; display:none; background:#2b2f33; padding:10px; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.3); width:176px; }
+  .sel-palette.show { display:block; }
+  .sel-palette .sel-mode-label { color:#fff; font-size:12px; margin-bottom:4px; }
+  .sel-swatches { display:flex; flex-wrap:wrap; gap:6px; }
+  .sel-swatches .sw { width:22px; height:22px; border-radius:5px; cursor:pointer; border:1px solid rgba(255,255,255,.28); }
+  .sel-palette .cust { display:flex; align-items:center; gap:8px; color:#fff; font-size:12px; margin-top:8px; }
+  .sel-palette .cust input { width:38px; height:26px; border:none; background:none; padding:0; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>🌿 公众号可视化编辑器</h1>
+  <div class="field">文章标题
+    <input type="text" id="docTitle" placeholder="如：费曼学习法">
+  </div>
+  <div class="field">字号
+    <select id="fontSize">
+      <option value="14">14px</option>
+      <option value="15" selected>15px</option>
+      <option value="16">16px</option>
+    </select>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn btn-ghost" id="btnImportMd" title="导入 .md 大纲 / 草稿，自动解析成组件">📥 导入MD</button>
+  <button class="btn btn-ghost" id="btnImportImg" title="插入本地图片（转 base64，发布前请换素材 URL）">🖼 插图片</button>
+  <button class="btn btn-ghost" id="btnUndo" title="撤销 (Ctrl+Z)">↶ 撤销</button>
+  <button class="btn btn-ghost" id="btnRedo" title="重做 (Ctrl+Y)">↷ 重做</button>
+  <button class="btn btn-ghost" id="btnExportMd" title="把当前排版导出为 .md">📤 导出MD</button>
+  <button class="btn btn-ghost" id="btnPreview">👁 预览</button>
+  <button class="btn btn-ghost" id="btnCopy">📋 复制代码</button>
+  <button class="btn btn-smart" id="btnSmart">✨ 智能排版</button>
+  <button class="btn btn-ghost" id="btnClear">🗑 清空</button>
+  <button class="btn btn-primary" id="btnExport">⬇ 导出 HTML</button>
+  <span class="wordcount" id="wordCount">0 字</span>
+</div>
+
+<div class="layout">
+  <!-- 左：组件库 -->
+  <div class="panel-l" id="compLib">
+    <div class="panel-title">组件库（点一下插入）</div>
+  </div>
+
+  <!-- 中：画布 -->
+  <div class="canvas-wrap">
+    <div class="phone" id="canvas">
+      <div class="phone-empty">从左侧点选组件开始编辑 👈<br>每块文字可直接点击修改<br>鼠标悬停块可 上移 / 下移 / 删除</div>
+    </div>
+  </div>
+
+  <!-- 右：主题 + 代码 -->
+  <div class="panel-r">
+    <div class="panel-title">配色主题（一键换肤）</div>
+    <div id="themeList"></div>
+    <div class="hint">主题只换颜色，不换结构。同一系列统一用一套更利于账号识别。</div>
+    <div class="panel-title">实时 HTML 代码</div>
+    <div class="code-box" id="codeBox">/* 添加组件后显示 */</div>
+    <div class="tip">导出的代码为<span style="color:#1e7b6b;font-weight:600">纯内联样式</span>，可直接粘贴进公众号编辑器 / 有一云 / 135 / 秀米。<br>微信会剥离 &lt;style&gt; 与 class，本工具已规避。</div>
+  </div>
+</div>
+
+<!-- 隐藏文件输入 -->
+<input type="file" id="fileMd" accept=".md,.markdown,.txt" style="display:none">
+<input type="file" id="fileImg" accept="image/*" multiple style="display:none">
+
+<!-- 智能排版浮层 -->
+<div class="modal-mask" id="smartMask">
+  <div class="modal">
+    <h3>✨ 智能排版</h3>
+    <p class="sub">填好主题，一键按黄金结构生成排版骨架；生成后直接点字修改即可。不再用浏览器弹窗，避免被拦截。</p>
+    <label>① 文章主标题</label>
+    <input id="smTitle" placeholder="如：科赫雪花：从三角形到雪花">
+    <label>② 系列副标题（头部小字）</label>
+    <input id="smSub" placeholder="如：分形之美 · 第 1 篇">
+    <label>③ 3 个分点（用 / 或 、 分隔，或分三行写）</label>
+    <textarea id="smPts" placeholder="是什么 / 为什么这么神 / 怎么落到孩子身上"></textarea>
+    <div class="row">
+      <div><label>④ 作者名</label><input id="smAuthor" placeholder="小芃"></div>
+      <div><label>⑤ 配色主题</label><select id="smTheme">
+        <option value="moqing">墨青</option><option value="jinglan">靛蓝</option><option value="nuancheng">暖橙</option><option value="wuzi">雾紫</option><option value="zhulv">竹绿</option>
+      </select></div>
+    </div>
+    <div class="acts">
+      <button class="cancel" id="smCancel">取消</button>
+      <button class="gen" id="smGen">生成骨架</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导出浮层 -->
+<div class="modal-mask" id="expMask">
+  <div class="modal" style="width:580px;">
+    <h3>⬇ 导出 HTML</h3>
+    <p class="sub">下面是<strong>纯内联样式</strong>的完整文章代码，可直接复制粘贴进公众号编辑器 / 有一云 / 135 / 秀米。<br>「下载 .html」会包一层外壳，保存为独立网页，双击即可在浏览器预览。</p>
+    <div class="code-box" id="expCode">/* 添加组件后显示 */</div>
+    <div class="acts">
+      <button class="cancel" id="expClose">关闭</button>
+      <button class="cancel" id="expCopy">📋 复制代码</button>
+      <button class="dl" id="expDl">💾 下载 .html</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 选区格式工具条：在画布选中文字后浮出 -->
+<div class="sel-bar" id="selBar">
+  <select id="selFs" title="字号（px）">
+    <option value="12">12px</option><option value="13">13px</option><option value="14">14px</option><option value="15">15px</option><option value="16">16px</option><option value="18">18px</option><option value="20">20px</option><option value="22">22px</option><option value="24">24px</option><option value="28">28px</option><option value="32">32px</option>
+  </select>
+  <button id="selColor" title="字体颜色" onmousedown="event.preventDefault()">A 颜色</button>
+  <button id="selBg" title="背景颜色" onmousedown="event.preventDefault()">⬛ 背景</button>
+  <button id="selClear" title="清除格式" onmousedown="event.preventDefault()">⌫ 清除</button>
+</div>
+<div class="sel-palette" id="selPalette">
+  <div class="sel-mode-label" id="selModeLabel">字体颜色</div>
+  <div class="sel-swatches" id="selSwatches"></div>
+  <label class="cust">自定义 <input type="color" id="selCust" value="#333333" onmousedown="event.preventDefault()"></label>
+</div>
+
+<script>
+/* ============ 主题（与 color-themes.md 一致，10 色） ============ */
+const THEMES = {
+  moqing: { name:'墨青', desc:'学术知识·干货', primary:'#1E7B6B', accent:'#C07A2B', bg:'#EAF4F1', border:'#D5E7E2', text:'#333333', text_sub:'#999999', primary_grad:'linear-gradient(135deg,#2A9D8F,#155C50)', primary_dark:'#155C50', tag_bg:'#DCEDE8', white:'#FFFFFF' },
+  jinglan:{ name:'靛蓝', desc:'科技·职场技能', primary:'#2B6CB0', accent:'#E07B39', bg:'#EAF1FA', border:'#D6E4F4', text:'#333333', text_sub:'#999999', primary_grad:'linear-gradient(135deg,#4A90D9,#1F4E80)', primary_dark:'#1F4E80', tag_bg:'#D9E6F5', white:'#FFFFFF' },
+  nuancheng:{name:'暖橙', desc:'成长·方法论', primary:'#D97706', accent:'#C2410C', bg:'#FEF3E7', border:'#F6DFC0', text:'#333333', text_sub:'#999999', primary_grad:'linear-gradient(135deg,#F59E0B,#B45309)', primary_dark:'#B45309', tag_bg:'#FDEBD8', white:'#FFFFFF' },
+  wuzi:   { name:'雾紫', desc:'文艺·哲思', primary:'#6B5CE7', accent:'#B05CE7', bg:'#F0EEFC', border:'#DDD8F6', text:'#333333', text_sub:'#999999', primary_grad:'linear-gradient(135deg,#8B7BF0,#5239C9)', primary_dark:'#5239C9', tag_bg:'#E5E1FA', white:'#FFFFFF' },
+  zhulv:  { name:'竹绿', desc:'生活·健康', primary:'#3E9B7A', accent:'#6B8E23', bg:'#EBF5F0', border:'#D3E7DD', text:'#333333', text_sub:'#999999', primary_grad:'linear-gradient(135deg,#5FB892,#2E7A5E)', primary_dark:'#2E7A5E', tag_bg:'#D8EFE6', white:'#FFFFFF' }
+};
+let curTheme = 'moqing';
+
+/* ============ 组件库（render 返回带占位符 + contenteditable 的内联 HTML） ============ */
+/* 约定：可编辑文本用 <span data-field="x" contenteditable="true">默认</span>，
+   导出时移除 contenteditable/data-field，并把 {{占位符}} 替换为主题色。*/
+const COMP = {
+  /* —— 框架 —— */
+  header: { g:'框架', ico:'📰', label:'头部导读卡', def:{k:'高效学习法 · 第 1 篇', t:'标题：一句话讲清这篇能帮你解决什么'},
+    html:d=>`<section style="margin:0 0 20px 0;padding:16px;background:{{primary_grad}};border-radius:10px;">
+  <span data-field="k" contenteditable="true" style="font-size:12px;color:rgba(255,255,255,.85);">${d.k}</span>
+  <span data-field="t" contenteditable="true" style="display:block;font-size:19px;font-weight:bold;color:#FFFFFF;line-height:1.4;margin-top:6px;">${d.t}</span></section>` },
+  banner: { g:'框架', ico:'🖼', label:'头图 Banner', def:{k:'高效学习法', t:'把知识讲明白，比刷题管用'},
+    html:d=>`<section style="margin:0 0 20px 0;padding:30px 18px;background:{{primary_grad}};border-radius:12px;text-align:center;">
+  <span data-field="k" contenteditable="true" style="display:block;font-size:12px;color:rgba(255,255,255,.85);letter-spacing:2px;">${d.k}</span>
+  <span data-field="t" contenteditable="true" style="display:block;font-size:22px;font-weight:bold;color:#FFFFFF;line-height:1.4;margin-top:8px;">${d.t}</span></section>` },
+  header_cover:{ g:'框架', ico:'🎴', label:'封面头图', def:{k:'分形之美', t:'科赫雪花：周长无限，面积有限', meta:'小芃 · 2026-09-02 · 约 5 分钟'},
+    html:d=>`<section style="margin:0 0 20px 0;padding:38px 22px;background:{{primary_grad}};border-radius:14px;text-align:center;">
+  <span data-field="k" contenteditable="true" style="display:block;font-size:12px;color:rgba(255,255,255,.85);letter-spacing:3px;">${d.k}</span>
+  <span data-field="t" contenteditable="true" style="display:block;font-size:24px;font-weight:bold;color:#FFFFFF;line-height:1.35;margin:10px 0 12px;">${d.t}</span>
+  <span style="display:inline-block;width:40px;height:3px;background:rgba(255,255,255,.7);border-radius:2px;"></span>
+  <span data-field="meta" contenteditable="true" style="display:block;font-size:12px;color:rgba(255,255,255,.85);margin-top:12px;">${d.meta}</span></section>` },
+  header_date:{ g:'框架', ico:'🗓', label:'日期分类头', def:{cat:'分形几何', t:'科赫雪花：反直觉的数学之美', date:'2026.09.02'},
+    html:d=>`<section style="margin:0 0 20px 0;display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid {{primary}};padding-bottom:14px;">
+  <div style="flex:1;">
+    <span data-field="cat" contenteditable="true" style="display:inline-block;font-size:12px;font-weight:bold;color:#FFFFFF;background:{{primary}};padding:3px 10px;border-radius:6px;margin-bottom:8px;">${d.cat}</span>
+    <span data-field="t" contenteditable="true" style="display:block;font-size:21px;font-weight:bold;color:{{text}};line-height:1.3;">${d.t}</span>
+  </div>
+  <span data-field="date" contenteditable="true" style="font-size:13px;color:{{text_sub}};white-space:nowrap;margin-left:12px;padding-top:4px;">${d.date}</span></section>` },
+  header_min:{ g:'框架', ico:'▏', label:'极简线标题', def:{t:'科赫雪花', sub:'从三角形到无限周长的分形之旅'},
+    html:d=>`<section style="margin:0 0 20px 0;">
+  <span style="display:block;width:32px;height:3px;background:{{primary}};border-radius:2px;margin-bottom:12px;"></span>
+  <span data-field="t" contenteditable="true" style="display:block;font-size:23px;font-weight:bold;color:{{text}};line-height:1.35;">${d.t}</span>
+  <span data-field="sub" contenteditable="true" style="display:block;font-size:13px;color:{{text_sub}};margin-top:6px;">${d.sub}</span></section>` },
+  series: { g:'框架', ico:'📑', label:'系列导航卡', def:{h:'本篇你将 get 到', i:'① 要点一<br>② 要点二<br>③ 要点三'},
+    html:d=>`<section style="margin:0 0 20px 0;padding:14px 16px;background:{{tag_bg}};border-radius:8px;">
+  <span data-field="h" contenteditable="true" style="font-size:13px;font-weight:bold;color:{{primary}};">${d.h}</span>
+  <p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.8;margin:6px 0 0;">${d.i}</p></section>` },
+  collection:{ g:'框架', ico:'📚', label:'合集导航条', def:{h:'📚 本系列还有', i:'02 间隔重复：背了又忘<br>03 番茄工作法：25 分钟逼出专注'},
+    html:d=>`<section style="margin:20px 0;padding:14px 16px;background:{{tag_bg}};border-radius:8px;">
+  <span data-field="h" contenteditable="true" style="font-size:13px;font-weight:bold;color:{{primary_dark}};">${d.h}</span>
+  <p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.9;margin:6px 0 0;">${d.i}</p></section>` },
+  footer: { g:'框架', ico:'✍', label:'页脚签名卡', def:{n:'我是 [你的名字]', s:'专注 [领域] 分享，关注我，一起把知识学扎实'},
+    html:d=>`<section style="margin:20px 0 0 0;padding:14px 16px;background:{{tag_bg}};border-radius:8px;text-align:center;">
+  <span data-field="n" contenteditable="true" style="font-size:13px;font-weight:bold;color:{{primary}};">${d.n}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:4px;">${d.s}</span></section>` },
+  recommend:{ g:'框架', ico:'📖', label:'推荐阅读卡', def:{h:'📖 推荐阅读', i:'· 间隔重复：为什么你背了又忘<br>· 番茄工作法：25 分钟逼出专注'},
+    html:d=>`<section style="margin:16px 0;padding:12px 14px;background:{{bg}};border-radius:8px;">
+  <span data-field="h" contenteditable="true" style="font-size:13px;font-weight:bold;color:{{primary}};">${d.h}</span>
+  <p data-field="i" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.8;margin:6px 0 0;">${d.i}</p></section>` },
+  endcard:{ g:'框架', ico:'🏁', label:'结束卡片', def:{t:'感谢阅读', s:'如果这篇对你有帮助，点个「在看」让更多人看到 💚'},
+    html:d=>`<section style="margin:28px 0 0 0;padding:24px 16px;text-align:center;background:{{tag_bg}};border-radius:12px;">
+  <span data-field="t" contenteditable="true" style="display:block;font-size:18px;font-weight:bold;color:{{primary}};">${d.t}</span>
+  <span style="display:block;width:36px;height:2px;background:{{primary}};margin:12px auto;"></span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:13px;color:{{text_sub}};line-height:1.6;">${d.s}</span></section>` },
+  summary:{ g:'框架', ico:'📌', label:'要点回顾卡', def:{h:'📌 本文要点', i:'1. 科赫曲线每步把线段三等分、中间凸起<br>2. 周长趋于无穷、面积收敛到 1.6 倍<br>3. 分形维数约 1.26，介于线与面之间'},
+    html:d=>`<section style="margin:22px 0;padding:16px;background:{{bg}};border-radius:10px;border:1px solid {{border}};">
+  <span data-field="h" contenteditable="true" style="display:block;font-size:14px;font-weight:bold;color:{{primary}};margin-bottom:10px;">${d.h}</span>
+  <p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.9;margin:0;">${d.i}</p></section>` },
+  subscribe:{ g:'框架', ico:'➕', label:'关注引导卡', def:{n:'公众号名字', s:'一句价值主张，为什么值得关注。'},
+    html:d=>`<section style="margin:22px 0;padding:18px;background:{{primary_grad}};border-radius:12px;display:flex;align-items:center;">
+  <div style="flex:1;">
+    <span data-field="n" contenteditable="true" style="display:block;font-size:16px;font-weight:bold;color:#FFFFFF;">${d.n}</span>
+    <span data-field="s" contenteditable="true" style="display:block;font-size:13px;color:rgba(255,255,255,.9);margin-top:4px;line-height:1.5;">${d.s}</span>
+  </div>
+  <section style="width:64px;height:64px;background:#FFFFFF;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:{{text_sub}};margin-left:12px;flex-shrink:0;">二维码</section></section>` },
+  header_logo:{ g:'框架', ico:'🔵', label:'带Logo头', def:{logo:'LOGO', t:'公众号名称', s:'一句 slogan'},
+    html:d=>`<section style="margin:0 0 20px 0;display:flex;align-items:center;padding-bottom:14px;border-bottom:1px solid {{border}};">
+  <span style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;background:{{primary_grad}};color:#FFFFFF;border-radius:10px;font-size:13px;font-weight:bold;margin-right:12px;">${d.logo}</span>
+  <span style="display:block;"><span data-field="t" contenteditable="true" style="display:block;font-size:16px;font-weight:bold;color:{{text}};">${d.t}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};">${d.s}</span></span></section>` },
+  header_center:{ g:'框架', ico:'🔆', label:'居中头', def:{k:'栏目名', t:'文章标题', sub:'副标题一句话'},
+    html:d=>`<section style="margin:0 0 20px 0;text-align:center;padding:20px 0;border-bottom:1px solid {{border}};">
+  <span data-field="k" contenteditable="true" style="display:block;font-size:12px;letter-spacing:2px;color:{{primary}};">${d.k}</span>
+  <span data-field="t" contenteditable="true" style="display:block;font-size:22px;font-weight:bold;color:{{text}};margin:8px 0 6px;">${d.t}</span>
+  <span data-field="sub" contenteditable="true" style="display:block;font-size:13px;color:{{text_sub}};">${d.sub}</span></section>` },
+  end_thanks:{ g:'框架', ico:'🙏', label:'感谢尾', def:{t:'感谢你读到这里', s:'如果有用，点个「在看」让更多人看到'},
+    html:d=>`<section style="margin:28px 0 0 0;text-align:center;">
+  <span data-field="t" contenteditable="true" style="display:block;font-size:17px;font-weight:bold;color:{{primary}};">${d.t}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:13px;color:{{text_sub}};margin-top:6px;">${d.s}</span></section>` },
+  footer_line:{ g:'框架', ico:'〰', label:'线脚签名', def:{n:'我是 [名字]', s:'关注我，一起把知识学扎实'},
+    html:d=>`<section style="margin:20px 0 0 0;padding-top:14px;border-top:1px solid {{border}};text-align:center;">
+  <span data-field="n" contenteditable="true" style="font-size:13px;font-weight:bold;color:{{primary}};">${d.n}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:4px;">${d.s}</span></section>` },
+  author_card:{ g:'框架', ico:'👤', label:'作者卡片', def:{n:'[作者名]', r:'[头衔 / 一句话简介]', s:'[专注领域]'},
+    html:d=>`<section style="margin:20px 0;padding:14px 16px;background:{{tag_bg}};border-radius:10px;display:flex;align-items:center;">
+  <span style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;background:{{primary_grad}};color:#FFFFFF;border-radius:50%;font-size:18px;margin-right:12px;">👤</span>
+  <span style="display:block;"><span data-field="n" contenteditable="true" style="display:block;font-size:14px;font-weight:bold;color:{{primary}};">${d.n}</span>
+  <span data-field="r" contenteditable="true" style="display:block;font-size:12px;color:{{text}};margin-top:2px;">${d.r}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:2px;">${d.s}</span></span></section>` },
+  /* —— 标题 —— */
+  h1: { g:'标题', ico:'▍', label:'一级小标题', def:{t:'一级小标题'},
+    html:d=>`<section style="margin:24px 0 12px 0;line-height:1.4;">
+  <span style="display:inline-block;vertical-align:middle;width:4px;height:18px;background:{{primary}};border-radius:2px;margin-right:8px;"></span>
+  <span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{primary}};vertical-align:middle;">${d.t}</span></section>` },
+  hbadge:{ g:'标题', ico:'①', label:'序号徽章标题', def:{n:'1', t:'序号标题'},
+    html:d=>`<section style="margin:24px 0 12px 0;line-height:1.4;">
+  <span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;background:{{primary_grad}};color:#FFFFFF;border-radius:50%;font-size:13px;font-weight:bold;margin-right:8px;vertical-align:middle;">${d.n}</span>
+  <span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{primary}};vertical-align:middle;">${d.t}</span></section>` },
+  h2: { g:'标题', ico:'▪', label:'二级小标题', def:{t:'二级小标题'},
+    html:d=>`<section style="margin:20px 0 10px 0;"><span data-field="t" contenteditable="true" style="font-size:16px;font-weight:bold;color:{{primary}};line-height:1.5;">${d.t}</span></section>` },
+  hcenter:{ g:'标题', ico:'—', label:'分割标题', def:{t:'小标题'},
+    html:d=>`<section style="margin:24px 0 14px 0;text-align:center;">
+  <span style="display:inline-block;width:24px;height:1px;background:{{primary}};vertical-align:middle;margin-right:10px;"></span>
+  <span data-field="t" contenteditable="true" style="font-size:16px;font-weight:bold;color:{{primary}};vertical-align:middle;">${d.t}</span>
+  <span style="display:inline-block;width:24px;height:1px;background:{{primary}};vertical-align:middle;margin-left:10px;"></span></section>` },
+  h_underline:{ g:'标题', ico:'▁', label:'下划线标题', def:{t:'小标题'},
+    html:d=>`<section style="margin:22px 0 12px 0;padding-bottom:8px;border-bottom:2px solid {{primary}};"><span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{text}};">${d.t}</span></section>` },
+  h_fill:{ g:'标题', ico:'▰', label:'实心底块标题', def:{t:'小标题'},
+    html:d=>`<section style="margin:22px 0 12px 0;"><span data-field="t" contenteditable="true" style="display:inline-block;font-size:16px;font-weight:bold;color:#FFFFFF;background:{{primary_grad}};padding:6px 14px;border-radius:6px;">${d.t}</span></section>` },
+  h_tag:{ g:'标题', ico:'◧', label:'强调线标题', def:{t:'小标题'},
+    html:d=>`<section style="margin:22px 0 12px 0;"><span style="display:inline-block;width:4px;height:18px;background:{{accent}};border-radius:2px;margin-right:8px;vertical-align:middle;"></span><span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{primary}};vertical-align:middle;">${d.t}</span></section>` },
+  h_dot:{ g:'标题', ico:'◉', label:'圆点标题', def:{t:'小标题'},
+    html:d=>`<section style="margin:22px 0 12px 0;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:{{accent}};margin-right:8px;vertical-align:middle;"></span><span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{text}};vertical-align:middle;">${d.t}</span></section>` },
+  h_number:{ g:'标题', ico:'#', label:'数字前缀标题', def:{n:'01', t:'小标题'},
+    html:d=>`<section style="margin:22px 0 12px 0;line-height:1.4;"><span style="font-size:22px;font-weight:bold;color:{{primary}};opacity:.35;margin-right:8px;vertical-align:middle;">${d.n}</span><span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{text}};vertical-align:middle;">${d.t}</span></section>` },
+  h_gradient:{ g:'标题', ico:'🌈', label:'渐变文字标题', def:{t:'小标题'},
+    html:d=>`<section style="margin:22px 0 12px 0;"><span data-field="t" contenteditable="true" style="font-size:20px;font-weight:bold;background:{{primary_grad}};-webkit-background-clip:text;background-clip:text;color:transparent;">${d.t}</span></section>` },
+  /* —— 正文 —— */
+  p: { g:'正文', ico:'¶', label:'正文段落', def:{t:'正文内容。把复杂的东西讲简单，才是真的懂了。'},
+    html:d=>`<section style="margin:0 0 16px 0;"><span data-field="t" contenteditable="true" style="font-size:{{fs}}px;color:{{text}};line-height:1.75;">${d.t}</span></section>` },
+  quote: { g:'正文', ico:'❝', label:'引用出处卡', def:{t:'"知识的真正价值，在于你能把它讲给一个外行听。"', s:'—— 理查德·费曼'},
+    html:d=>`<section style="margin:16px 0;padding:14px 16px;background:{{bg}};border-left:4px solid {{primary}};border-radius:4px;">
+  <span data-field="t" contenteditable="true" style="font-size:15px;color:{{text}};line-height:1.7;font-style:italic;">${d.t}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:6px;">${d.s}</span></section>` },
+  quotebig:{ g:'正文', ico:'❞', label:'大引号引用', def:{t:'把复杂的事讲简单，才是真懂了。别用术语掩盖不懂。', s:'—— 费曼'},
+    html:d=>`<section style="margin:18px 0;padding:18px 20px;background:{{bg}};border-radius:8px;position:relative;">
+  <span style="position:absolute;top:2px;left:10px;font-size:46px;line-height:1;color:{{primary}};opacity:.18;font-family:Georgia,serif;">“</span>
+  <span data-field="t" contenteditable="true" style="display:block;font-size:15px;color:{{text}};line-height:1.8;margin:14px 0 0;font-style:italic;">${d.t}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:8px;text-align:right;">${d.s}</span></section>` },
+  p_highlight:{ g:'正文', ico:'🔆', label:'高亮背景段', def:{t:'这是一句你想让读者记住的重点，用浅色底突出。'},
+    html:d=>`<section style="margin:0 0 16px 0;padding:12px 14px;background:{{tag_bg}};border-radius:8px;"><span data-field="t" contenteditable="true" style="font-size:{{fs}}px;color:{{text}};line-height:1.75;">${d.t}</span></section>` },
+  p_center:{ g:'正文', ico:'⊙', label:'居中引言段', def:{t:'一句话点题，居中更显分量。'},
+    html:d=>`<section style="margin:0 0 16px 0;text-align:center;"><span data-field="t" contenteditable="true" style="font-size:{{fs}}px;color:{{primary}};line-height:1.7;font-weight:bold;">${d.t}</span></section>` },
+  p_two:{ g:'正文', ico:'▥', label:'双栏段', def:{t1:'左栏内容一句话。', t2:'右栏内容一句话。'},
+    html:d=>`<table style="width:100%;border-collapse:separate;border-spacing:10px;margin:0 0 16px 0;table-layout:fixed;"><tr><td style="width:50%;vertical-align:top;"><span data-field="t1" contenteditable="true" style="font-size:{{fs}}px;color:{{text}};line-height:1.7;">${d.t1}</span></td><td style="width:50%;vertical-align:top;"><span data-field="t2" contenteditable="true" style="font-size:{{fs}}px;color:{{text}};line-height:1.7;">${d.t2}</span></td></tr></table>` },
+  quote_card:{ g:'正文', ico:'❝', label:'引用卡片', def:{t:'把复杂的事讲简单，才是真懂了。', s:'—— 费曼'},
+    html:d=>`<section style="margin:18px 0;padding:20px;background:{{bg}};border-radius:10px;text-align:center;">
+  <span style="font-size:40px;color:{{primary}};line-height:1;font-family:Georgia,serif;">“</span>
+  <span data-field="t" contenteditable="true" style="display:block;font-size:16px;color:{{text}};line-height:1.8;margin-top:6px;font-style:italic;">${d.t}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:8px;">${d.s}</span></section>` },
+  quote_center:{ g:'正文', ico:'❢', label:'居中引言', def:{t:'一句值得反复读的话。', s:'—— 出处'},
+    html:d=>`<section style="margin:18px 0;text-align:center;"><span data-field="t" contenteditable="true" style="font-size:17px;color:{{primary}};line-height:1.8;font-weight:bold;font-style:italic;">${d.t}</span><span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:6px;">${d.s}</span></section>` },
+  quote_mark:{ g:'正文', ico:'🗨', label:'大标记引用', def:{t:'好文章不是写给人看的，是写给人想通的。'},
+    html:d=>`<section style="margin:18px 0;padding:18px 20px;background:{{primary_grad}};border-radius:10px;">
+  <span style="font-size:30px;color:rgba(255,255,255,.7);font-family:Georgia,serif;line-height:1;">“</span>
+  <span data-field="t" contenteditable="true" style="display:block;font-size:15px;color:#FFFFFF;line-height:1.8;margin-top:-12px;font-style:italic;">${d.t}</span></section>` },
+  quote_color:{ g:'正文', ico:'🎨', label:'彩底引用', def:{t:'这是一段需要强调的引用，彩底更吸睛。', s:'—— 出处'},
+    html:d=>`<section style="margin:18px 0;padding:14px 16px;background:{{tag_bg}};border-left:4px solid {{accent}};border-radius:4px;">
+  <span data-field="t" contenteditable="true" style="font-size:15px;color:{{text}};line-height:1.7;font-style:italic;">${d.t}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:6px;">${d.s}</span></section>` },
+  /* —— 重点块 —— */
+  golden: { g:'重点块', ico:'💬', label:'金句大字', def:{t:'"如果你不能简单地解释一个东西，说明你还没真正理解它。"'},
+    html:d=>`<section style="margin:22px 0;padding:18px 10px;text-align:center;">
+  <span data-field="t" contenteditable="true" style="font-size:19px;font-weight:bold;color:{{primary}};line-height:1.6;">${d.t}</span></section>` },
+  goldencard:{ g:'重点块', ico:'🔹', label:'金句卡片', def:{t:'把复杂的东西讲简单，才是真的懂了。'},
+    html:d=>`<section style="margin:16px 0;padding:14px 16px;background:{{bg}};border-left:4px solid {{primary}};border-radius:4px;">
+  <span data-field="t" contenteditable="true" style="font-size:15px;color:{{text}};line-height:1.7;">${d.t}</span></section>` },
+  stat: { g:'重点块', ico:'🔢', label:'数据高亮卡', def:{n:'90%', s:'主动讲授的记忆留存率（被动阅读仅约 10%）'},
+    html:d=>`<section style="margin:16px 0;padding:18px;text-align:center;background:{{bg}};border-radius:8px;">
+  <span data-field="n" contenteditable="true" style="font-size:30px;font-weight:bold;color:{{accent}};">${d.n}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:13px;color:{{text_sub}};margin-top:4px;">${d.s}</span></section>` },
+  contrast:{ g:'重点块', ico:'⚖', label:'对比卡', def:{w:'看懂了就以为会了，直接去刷题。', r:'合上书自己讲一遍，讲不出就补。'},
+    html:d=>`<table style="width:100%;border-collapse:separate;border-spacing:6px;margin:16px 0;table-layout:fixed;">
+<tr><td style="width:50%;padding:12px;background:#FCEDEC;border-radius:6px;vertical-align:top;">
+  <span style="font-size:13px;font-weight:bold;color:#E05A4F;">✕ 误区</span>
+  <p data-field="w" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.6;margin:6px 0 0;">${d.w}</p>
+</td><td style="width:50%;padding:12px;background:{{bg}};border-radius:6px;vertical-align:top;">
+  <span style="font-size:13px;font-weight:bold;color:{{primary}};">✓ 正确</span>
+  <p data-field="r" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.6;margin:6px 0 0;">${d.r}</p>
+</td></tr></table>` },
+  steps: { g:'重点块', ico:'🧭', label:'步骤流程卡', def:{s1:'写下概念', d1:'拿出一张白纸，把要学的概念写下来。', s2:'讲给 8 岁小孩', d2:'用最白的大白话，假装对方完全不懂。'},
+    html:d=>`<section style="margin:14px 0;"><span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;background:{{primary_grad}};color:#FFFFFF;border-radius:50%;font-size:13px;font-weight:bold;margin-right:8px;vertical-align:middle;">1</span>
+  <span data-field="s1" contenteditable="true" style="font-size:15px;color:{{text}};font-weight:bold;vertical-align:middle;">${d.s1}</span>
+  <p data-field="d1" contenteditable="true" style="margin:6px 0 0 30px;font-size:14px;color:{{text}};line-height:1.6;">${d.d1}</p></section>
+<section style="margin:14px 0;"><span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;background:{{primary_grad}};color:#FFFFFF;border-radius:50%;font-size:13px;font-weight:bold;margin-right:8px;vertical-align:middle;">2</span>
+  <span data-field="s2" contenteditable="true" style="font-size:15px;color:{{text}};font-weight:bold;vertical-align:middle;">${d.s2}</span>
+  <p data-field="d2" contenteditable="true" style="margin:6px 0 0 30px;font-size:14px;color:{{text}};line-height:1.6;">${d.d2}</p></section>` },
+  icons: { g:'重点块', ico:'🔳', label:'要点图标卡', def:{e1:'📌', t1:'先讲简单的', c1:'建立信心，别一上来就啃难题。', e2:'💡', t2:'真问为什么', c2:'你当学生要装傻，别敷衍。'},
+    html:d=>`<table style="width:100%;border-collapse:separate;border-spacing:8px;margin:16px 0;table-layout:fixed;">
+<tr><td style="width:50%;padding:12px;background:{{bg}};border-radius:8px;vertical-align:top;">
+  <span style="font-size:18px;">${d.e1}</span>
+  <p data-field="t1" contenteditable="true" style="font-size:14px;font-weight:bold;color:{{primary}};margin:6px 0 4px;">${d.t1}</p>
+  <p data-field="c1" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.5;margin:0;">${d.c1}</p>
+</td><td style="width:50%;padding:12px;background:{{bg}};border-radius:8px;vertical-align:top;">
+  <span style="font-size:18px;">${d.e2}</span>
+  <p data-field="t2" contenteditable="true" style="font-size:14px;font-weight:bold;color:{{primary}};margin:6px 0 4px;">${d.t2}</p>
+  <p data-field="c2" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.5;margin:0;">${d.c2}</p>
+</td></tr></table>` },
+  timeline:{ g:'重点块', ico:'🕒', label:'时间轴', def:{t1:'阶段一 · 入门', c1:'先建立基础认知，不追求深度。', t2:'阶段二 · 进阶', c2:'开始做项目，在错误里迭代。'},
+    html:d=>`<section style="margin:16px 0;padding:0 0 0 14px;border-left:2px solid {{border}};">
+  <section style="position:relative;margin:0 0 14px 0;">
+    <span style="position:absolute;left:-22px;top:3px;width:10px;height:10px;border-radius:50%;background:{{primary_grad}};"></span>
+    <span data-field="t1" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};">${d.t1}</span>
+    <p data-field="c1" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.6;margin:4px 0 0;">${d.c1}</p>
+  </section>
+  <section style="position:relative;margin:0 0 14px 0;">
+    <span style="position:absolute;left:-22px;top:3px;width:10px;height:10px;border-radius:50%;background:{{primary_grad}};"></span>
+    <span data-field="t2" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};">${d.t2}</span>
+    <p data-field="c2" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.6;margin:4px 0 0;">${d.c2}</p>
+  </section></section>` },
+  tips: { g:'重点块', ico:'💡', label:'多色提示框', def:{v:'info', l:'提示', t:'这是补充信息，帮助理解上下文。'},
+    html:d=>{ const c={info:['#2B8AD9','#EAF3FB','💡 提示'],success:['#2E9E5B','#EAF6EE','✅ 可做'],warning:['#E08A1E','#FEF3E2','⚠️ 注意'],danger:['#D9534F','#FCEAEA','🚫 避坑']}[d.v]||['#2B8AD9','#EAF3FB','💡 提示'];
+      return `<section style="margin:14px 0;padding:12px 14px;background:${c[1]};border-left:4px solid ${c[0]};border-radius:6px;">
+  <span contenteditable="true" data-field="l" style="font-size:14px;font-weight:bold;color:${c[0]};">${d.l}</span>
+  <p data-field="t" contenteditable="true" style="font-size:14px;color:#333;line-height:1.6;margin:4px 0 0;">${d.t}</p></section>`; } },
+  infocard:{ g:'重点块', ico:'📌', label:'信息卡', def:{e:'📌', t:'概念定义', c:'用一句话把概念说清，配一个例子。'},
+    html:d=>`<section style="margin:14px 0;padding:14px;background:{{bg}};border-radius:8px;display:flex;align-items:flex-start;">
+  <span style="font-size:22px;margin-right:10px;">${d.e}</span>
+  <span style="display:block;"><span data-field="t" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};">${d.t}</span>
+  <span data-field="c" contenteditable="true" style="display:block;font-size:14px;color:{{text}};line-height:1.6;margin-top:3px;">${d.c}</span></span></section>` },
+  checklist:{ g:'重点块', ico:'✅', label:'标注列表', def:{i:'<span style="color:{{primary}};font-weight:bold;">✓</span> 先理解概念，再刷题<br><span style="color:#D9534F;font-weight:bold;">✕</span> 看懂就以为会了<br><span style="color:{{primary}};font-weight:bold;">✓</span> 讲给外行听一遍'},
+    html:d=>`<section style="margin:14px 0;"><p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.9;margin:0;">${d.i}</p></section>` },
+  triple:{ g:'重点块', ico:'🔲', label:'三列卡', def:{n1:'3', s1:'个步骤', n2:'90%', s2:'留存率', n3:'2', s3:'分钟'},
+    html:d=>`<table style="width:100%;border-collapse:separate;border-spacing:6px;margin:16px 0;table-layout:fixed;">
+<tr><td style="width:33.3%;padding:12px;background:{{bg}};border-radius:8px;vertical-align:top;text-align:center;">
+  <span data-field="n1" contenteditable="true" style="display:block;font-size:20px;font-weight:bold;color:{{accent}};">${d.n1}</span>
+  <span data-field="s1" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:2px;">${d.s1}</span>
+</td><td style="width:33.3%;padding:12px;background:{{bg}};border-radius:8px;vertical-align:top;text-align:center;">
+  <span data-field="n2" contenteditable="true" style="display:block;font-size:20px;font-weight:bold;color:{{accent}};">${d.n2}</span>
+  <span data-field="s2" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:2px;">${d.s2}</span>
+</td><td style="width:33.3%;padding:12px;background:{{bg}};border-radius:8px;vertical-align:top;text-align:center;">
+  <span data-field="n3" contenteditable="true" style="display:block;font-size:20px;font-weight:bold;color:{{accent}};">${d.n3}</span>
+  <span data-field="s3" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:2px;">${d.s3}</span>
+</td></tr></table>` },
+  qa: { g:'重点块', ico:'💬', label:'问答气泡', def:{q:'为什么看懂了还是不会做？', a:'看懂是被动输入，讲出来才是主动输出，差一个"用自己的话复述"。'},
+    html:d=>`<section style="margin:14px 0;">
+  <p style="margin:0 0 8px 0;font-size:14px;color:{{text}};"><span style="display:inline-block;background:{{tag_bg}};color:{{primary_dark}};font-weight:bold;padding:2px 8px;border-radius:6px;margin-right:6px;">Q</span><span data-field="q" contenteditable="true">${d.q}</span></p>
+  <p style="margin:0;font-size:14px;color:{{text}};"><span style="display:inline-block;background:{{primary_grad}};color:#FFFFFF;font-weight:bold;padding:2px 8px;border-radius:6px;margin-right:6px;">A</span><span data-field="a" contenteditable="true">${d.a}</span></p></section>` },
+  side: { g:'重点块', ico:'➡', label:'侧标重点', def:{t:'这一段是整篇的核心：先把概念讲给 8 岁小孩听，讲不通的地方就是你没真懂的地方。'},
+    html:d=>`<section style="margin:14px 0;padding:12px 14px;background:{{bg}};border-right:4px solid {{accent}};border-radius:6px;">
+  <span data-field="t" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.7;">${d.t}</span></section>` },
+  code: { g:'重点块', ico:'</>', label:'代码块', def:{t:'var a = 1;<br>var b = 2;<br>console.log(a + b);'},
+    html:d=>`<section style="margin:14px 0;padding:12px 14px;background:#2B2B2B;border-radius:8px;">
+  <span data-field="t" contenteditable="true" style="display:block;font-family:Consolas,Menlo,monospace;font-size:13px;color:#E6E6E6;line-height:1.7;white-space:pre;">${d.t}</span></section>` },
+  imgtext:{ g:'重点块', ico:'🖼', label:'图文卡', def:{t:'案例标题', c:'一句话讲清这个案例说明什么，给读者启发。'},
+    html:d=>`<table style="width:100%;border-collapse:separate;border-spacing:0;margin:16px 0;table-layout:fixed;">
+<tr><td style="width:34%;padding:0;vertical-align:middle;">
+  <section style="height:96px;background:{{primary_grad}};border-radius:8px 0 0 8px;display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-size:13px;">图片占位</section>
+</td><td style="width:66%;padding:12px 14px;background:{{bg}};border-radius:0 8px 8px 0;vertical-align:middle;">
+  <span data-field="t" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};">${d.t}</span>
+  <p data-field="c" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.6;margin:4px 0 0;">${d.c}</p>
+</td></tr></table>` },
+  card_shadow:{ g:'重点块', ico:'🃏', label:'阴影卡', def:{t:'卡片标题', c:'卡片内容一句话说明。'},
+    html:d=>`<section style="margin:14px 0;padding:16px;background:{{white}};border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.06);">
+  <span data-field="t" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};">${d.t}</span>
+  <p data-field="c" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.6;margin:6px 0 0;">${d.c}</p></section>` },
+  card_round:{ g:'重点块', ico:'⭕', label:'大圆角卡', def:{t:'卡片标题', c:'卡片内容一句话说明。'},
+    html:d=>`<section style="margin:14px 0;padding:18px;background:{{bg}};border-radius:18px;">
+  <span data-field="t" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};">${d.t}</span>
+  <p data-field="c" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.6;margin:6px 0 0;">${d.c}</p></section>` },
+  card_icon:{ g:'重点块', ico:'🏷', label:'图标卡', def:{e:'📌', t:'卡片标题', c:'卡片内容一句话说明。'},
+    html:d=>`<section style="margin:14px 0;padding:14px;background:{{tag_bg}};border-radius:10px;display:flex;align-items:center;">
+  <span style="font-size:28px;margin-right:12px;">${d.e}</span>
+  <span style="display:block;"><span data-field="t" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};">${d.t}</span>
+  <span data-field="c" contenteditable="true" style="display:block;font-size:13px;color:{{text}};line-height:1.5;margin-top:2px;">${d.c}</span></span></section>` },
+  stat_grid:{ g:'重点块', ico:'🔳', label:'数据网格', def:{n1:'90%', s1:'留存率', n2:'3 步', s2:'可执行'},
+    html:d=>`<table style="width:100%;border-collapse:separate;border-spacing:6px;margin:16px 0;table-layout:fixed;"><tr><td style="width:50%;padding:14px;background:{{bg}};border-radius:8px;text-align:center;">
+  <span data-field="n1" contenteditable="true" style="display:block;font-size:24px;font-weight:bold;color:{{accent}};">${d.n1}</span>
+  <span data-field="s1" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:2px;">${d.s1}</span></td><td style="width:50%;padding:14px;background:{{bg}};border-radius:8px;text-align:center;">
+  <span data-field="n2" contenteditable="true" style="display:block;font-size:24px;font-weight:bold;color:{{accent}};">${d.n2}</span>
+  <span data-field="s2" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:2px;">${d.s2}</span></td></tr></table>` },
+  stat_big:{ g:'重点块', ico:'🔟', label:'巨数字', def:{n:'1.26', s:'科赫曲线的分形维数，介于线与面之间'},
+    html:d=>`<section style="margin:16px 0;padding:24px;text-align:center;background:{{primary_grad}};border-radius:12px;">
+  <span data-field="n" contenteditable="true" style="display:block;font-size:42px;font-weight:bold;color:#FFFFFF;line-height:1;">${d.n}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:13px;color:rgba(255,255,255,.9);margin-top:8px;">${d.s}</span></section>` },
+  stat_compare:{ g:'重点块', ico:'📈', label:'对比数字', def:{n1:'10%', n2:'90%', s:'从被动阅读到主动讲授的留存率跃升'},
+    html:d=>`<section style="margin:16px 0;padding:16px;background:{{bg}};border-radius:8px;text-align:center;">
+  <span data-field="n1" contenteditable="true" style="font-size:22px;font-weight:bold;color:{{text_sub}};">${d.n1}</span>
+  <span style="font-size:20px;color:{{accent}};margin:0 10px;">→</span>
+  <span data-field="n2" contenteditable="true" style="font-size:28px;font-weight:bold;color:{{accent}};">${d.n2}</span>
+  <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:6px;">${d.s}</span></section>` },
+  list_num:{ g:'重点块', ico:'1️⃣', label:'数字列表', def:{i:'<span style="font-weight:bold;color:{{primary}};">1.</span> 第一点<br><span style="font-weight:bold;color:{{primary}};">2.</span> 第二点<br><span style="font-weight:bold;color:{{primary}};">3.</span> 第三点'},
+    html:d=>`<section style="margin:14px 0;"><p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.9;margin:0;">${d.i}</p></section>` },
+  list_arrow:{ g:'重点块', ico:'▸', label:'箭头列表', def:{i:'<span style="color:{{primary}};">▸</span> 第一点<br><span style="color:{{primary}};">▸</span> 第二点<br><span style="color:{{primary}};">▸</span> 第三点'},
+    html:d=>`<section style="margin:14px 0;"><p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.9;margin:0;">${d.i}</p></section>` },
+  list_circle:{ g:'重点块', ico:'⚫', label:'圆点列表', def:{i:'<span style="color:{{accent}};">●</span> 第一点<br><span style="color:{{accent}};">●</span> 第二点<br><span style="color:{{accent}};">●</span> 第三点'},
+    html:d=>`<section style="margin:14px 0;"><p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.9;margin:0;">${d.i}</p></section>` },
+  list_step:{ g:'重点块', ico:'🔢', label:'步骤列表', def:{i:'<span style="display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;background:{{primary_grad}};color:#fff;border-radius:50%;font-size:12px;font-weight:bold;margin-right:6px;">1</span>第一步<br><span style="display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;background:{{primary_grad}};color:#fff;border-radius:50%;font-size:12px;font-weight:bold;margin-right:6px;">2</span>第二步'},
+    html:d=>`<section style="margin:14px 0;"><p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:2;margin:0;">${d.i}</p></section>` },
+  tips_solid:{ g:'重点块', ico:'💠', label:'实心提示框', def:{l:'提示', t:'这是补充信息，帮助理解上下文。'},
+    html:d=>`<section style="margin:14px 0;padding:12px 14px;background:{{primary_grad}};border-radius:6px;">
+  <span data-field="l" contenteditable="true" style="font-size:13px;font-weight:bold;color:#FFFFFF;">💡 ${d.l}</span>
+  <p data-field="t" contenteditable="true" style="font-size:13px;color:rgba(255,255,255,.95);line-height:1.6;margin:4px 0 0;">${d.t}</p></section>` },
+  note:{ g:'重点块', ico:'📝', label:'便签', def:{t:'便签：随手记一句提醒，用暖色底更显眼。'},
+    html:d=>`<section style="margin:14px 0;padding:14px 16px;background:#FFF8E1;border-left:4px solid #E0A82E;border-radius:6px;">
+  <span style="font-size:13px;font-weight:bold;color:#9A6B00;">📝 便签</span>
+  <p data-field="t" contenteditable="true" style="font-size:14px;color:#7A5A00;line-height:1.6;margin:4px 0 0;">${d.t}</p></section>` },
+  box_callout:{ g:'重点块', ico:'📣', label:'强调框', def:{t:'整段强调：这是全篇最该记住的一句话。'},
+    html:d=>`<section style="margin:16px 0;padding:16px;background:{{bg}};border:1.5px solid {{primary}};border-radius:10px;">
+  <span data-field="t" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};line-height:1.7;">${d.t}</span></section>` },
+  pill:{ g:'重点块', ico:'🔖', label:'胶囊标签', def:{i:'#标签一 #标签二 #标签三'},
+    html:d=>`<section style="margin:14px 0;"><span data-field="i" contenteditable="true" style="font-size:13px;color:{{primary}};">${d.i}</span></section>` },
+  badge_row:{ g:'重点块', ico:'🎯', label:'徽章行', def:{b1:'📌 要点', b2:'💡 方法', b3:'✅ 已验证'},
+    html:d=>`<section style="margin:14px 0;text-align:center;">
+  <span data-field="b1" contenteditable="true" style="display:inline-block;font-size:13px;color:{{primary}};background:{{tag_bg}};padding:5px 12px;border-radius:16px;margin:0 4px;">${d.b1}</span>
+  <span data-field="b2" contenteditable="true" style="display:inline-block;font-size:13px;color:{{primary}};background:{{tag_bg}};padding:5px 12px;border-radius:16px;margin:0 4px;">${d.b2}</span>
+  <span data-field="b3" contenteditable="true" style="display:inline-block;font-size:13px;color:{{primary}};background:{{tag_bg}};padding:5px 12px;border-radius:16px;margin:0 4px;">${d.b3}</span></section>` },
+  /* —— 互动 / 分隔 —— */
+  think: { g:'互动', ico:'✋', label:'互动引导', def:{h:'✋ 停下来想一想：', t:'昨天学的那个知识点，能用大白话讲出来吗？'},
+    html:d=>`<section style="margin:16px 0;padding:12px 16px;background:{{bg}};border-radius:6px;">
+  <span data-field="h" contenteditable="true" style="font-size:14px;color:{{primary}};line-height:1.6;font-weight:bold;">${d.h}</span>
+  <span data-field="t" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.6;">${d.t}</span></section>` },
+  tags: { g:'互动', ico:'#', label:'话题标签', def:{i:'#高效学习法 #费曼学习法 #学习方法'},
+    html:d=>`<section style="margin:14px 0;"><span data-field="i" contenteditable="true" style="font-size:12px;color:{{primary}};">${d.i}</span></section>` },
+  divider: { g:'互动', ico:'·', label:'装饰分隔', def:{},
+    html:d=>`<section style="margin:22px 0;text-align:center;">
+  <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:{{primary}};margin:0 5px;"></span>
+  <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:{{primary}};margin:0 5px;opacity:.5;"></span>
+  <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:{{primary}};margin:0 5px;"></span></section>` },
+  line: { g:'互动', ico:'—', label:'线分割', def:{},
+    html:d=>`<section style="margin:20px 0;border-top:1px solid {{border}};"></section>` },
+  cta: { g:'互动', ico:'👉', label:'结尾按钮', def:{t:'点个「在看」鼓励一下 →'},
+    html:d=>`<section style="margin:22px 0;text-align:center;">
+  <span data-field="t" contenteditable="true" style="display:inline-block;padding:11px 30px;background:{{primary_grad}};color:#FFFFFF;border-radius:24px;font-size:15px;font-weight:bold;">${d.t}</span></section>` },
+  likebar:{ g:'互动', ico:'👍', label:'点赞互动条', def:{l1:'👍 点赞', l2:'⭐ 在看', l3:'🔖 收藏', l4:'↗ 分享'},
+    html:d=>`<section style="margin:22px 0;text-align:center;">
+  <span style="display:inline-block;padding:9px 4px;background:{{tag_bg}};border-radius:24px;font-size:14px;white-space:nowrap;">
+    <span data-field="l1" contenteditable="true" style="padding:0 14px;color:{{primary}};font-weight:bold;">${d.l1}</span><span style="color:{{border}};">|</span>
+    <span data-field="l2" contenteditable="true" style="padding:0 14px;color:{{primary}};font-weight:bold;">${d.l2}</span><span style="color:{{border}};">|</span>
+    <span data-field="l3" contenteditable="true" style="padding:0 14px;color:{{primary}};font-weight:bold;">${d.l3}</span><span style="color:{{border}};">|</span>
+    <span data-field="l4" contenteditable="true" style="padding:0 14px;color:{{primary}};font-weight:bold;">${d.l4}</span>
+  </span></section>` },
+  likebig:{ g:'互动', ico:'❤', label:'点赞大按钮', def:{t:'❤️ 点赞支持'},
+    html:d=>`<section style="margin:22px 0;text-align:center;">
+  <span data-field="t" contenteditable="true" style="display:inline-flex;align-items:center;gap:8px;padding:12px 34px;background:{{bg}};border:1.5px solid {{primary}};color:{{primary}};border-radius:28px;font-size:16px;font-weight:bold;">${d.t}</span></section>` },
+  reward:{ g:'互动', ico:'☕', label:'赞赏卡片', def:{t:'觉得有用，赏杯咖啡 ☕'},
+    html:d=>`<section style="margin:22px 0;text-align:center;padding:18px;background:{{tag_bg}};border-radius:12px;">
+  <span style="display:block;font-size:26px;">☕</span>
+  <span data-field="t" contenteditable="true" style="display:block;font-size:14px;font-weight:bold;color:{{primary}};margin:8px 0 10px;">${d.t}</span>
+  <section style="width:80px;height:80px;background:#FFFFFF;border:1px dashed {{primary}};border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:{{text_sub}};">赞赏码</section></section>` },
+  vote:{ g:'互动', ico:'🗳', label:'投票条', def:{q:'你觉得哪一点最有用？', o1:'A 方法', o2:'B 案例', o3:'C 工具'},
+    html:d=>`<section style="margin:18px 0;padding:14px;background:{{bg}};border-radius:10px;">
+  <span data-field="q" contenteditable="true" style="display:block;font-size:14px;font-weight:bold;color:{{primary}};margin-bottom:10px;">${d.q}</span>
+  <span data-field="o1" contenteditable="true" style="display:inline-block;font-size:13px;color:{{text}};background:{{white}};border:1px solid {{border}};padding:6px 14px;border-radius:16px;margin:0 4px 6px 0;">${d.o1}</span>
+  <span data-field="o2" contenteditable="true" style="display:inline-block;font-size:13px;color:{{text}};background:{{white}};border:1px solid {{border}};padding:6px 14px;border-radius:16px;margin:0 4px 6px 0;">${d.o2}</span>
+  <span data-field="o3" contenteditable="true" style="display:inline-block;font-size:13px;color:{{text}};background:{{white}};border:1px solid {{border}};padding:6px 14px;border-radius:16px;margin:0 4px 6px 0;">${d.o3}</span></section>` },
+  qa_card:{ g:'互动', ico:'❓', label:'问答卡', def:{q:'问：为什么看懂了还是不会做？', a:'答：看懂是被动输入，讲出来才是主动输出。'},
+    html:d=>`<section style="margin:16px 0;padding:14px 16px;background:{{tag_bg}};border-radius:10px;">
+  <p data-field="q" contenteditable="true" style="font-size:14px;font-weight:bold;color:{{primary}};line-height:1.6;margin:0 0 8px;">${d.q}</p>
+  <p data-field="a" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.7;margin:0;">${d.a}</p></section>` },
+  share_round:{ g:'互动', ico:'↗', label:'圆形分享', def:{t:'分享给朋友'},
+    html:d=>`<section style="margin:20px 0;text-align:center;">
+  <span data-field="t" contenteditable="true" style="display:inline-block;width:54px;height:54px;line-height:54px;text-align:center;background:{{primary_grad}};color:#FFFFFF;border-radius:50%;font-size:20px;">↗</span>
+  <span style="display:block;font-size:13px;color:{{text_sub}};margin-top:8px;">${d.t}</span></section>` },
+  progress:{ g:'互动', ico:'📊', label:'进度条', def:{t:'读完进度', p:'70%'},
+    html:d=>`<section style="margin:16px 0;">
+  <span data-field="t" contenteditable="true" style="display:block;font-size:13px;color:{{text_sub}};margin-bottom:6px;">${d.t}</span>
+  <span style="display:block;height:8px;background:{{border}};border-radius:4px;overflow:hidden;"><span style="display:block;height:8px;width:${d.p};background:{{primary_grad}};border-radius:4px;"></span></span></section>` },
+  declare:{ g:'互动', ico:'ⓘ', label:'合规声明', def:{t:'本文为个人经验整理，仅供参考。内容如有不严谨之处，欢迎评论区指正。'},
+    html:d=>`<section style="margin:16px 0 0 0;padding-top:12px;border-top:1px solid {{border}};">
+  <span data-field="t" contenteditable="true" style="font-size:12px;color:{{text_sub}};line-height:1.6;">${d.t}</span></section>` },
+  image:{ g:'媒体', ico:'🖼', label:'图片块', def:{cap:'图注（可留空）', src:''},
+    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>";
+      const src = d.src || ph;
+      return `<section style="margin:16px 0;"><img src="${src}" style="display:block;width:100%;border-radius:8px;max-height:420px;object-fit:cover;">${d.cap?`<span data-field="cap" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};text-align:center;margin-top:6px;">${d.cap}</span>`:''}</section>`; } },
+  img_full:{ g:'媒体', ico:'🖼', label:'全宽图', def:{cap:'图注（可留空）', src:''},
+    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;"><img src="${src}" style="display:block;width:100%;border-radius:4px;max-height:460px;object-fit:cover;">${d.cap?`<span data-field="cap" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};text-align:center;margin-top:6px;">${d.cap}</span>`:''}</section>`; } },
+  img_round:{ g:'媒体', ico:'⭕', label:'圆角大图', def:{cap:'图注（可留空）', src:''},
+    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;"><img src="${src}" style="display:block;width:100%;border-radius:16px;max-height:420px;object-fit:cover;">${d.cap?`<span data-field="cap" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};text-align:center;margin-top:6px;">${d.cap}</span>`:''}</section>`; } },
+  img_cap:{ g:'媒体', ico:'🏞', label:'图注卡', def:{cap:'图片说明一句话', src:''},
+    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;background:{{bg}};border-radius:12px;overflow:hidden;"><img src="${src}" style="display:block;width:100%;max-height:300px;object-fit:cover;">${d.cap?`<p data-field="cap" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.6;padding:10px 14px;margin:0;">${d.cap}</p>`:''}</section>`; } }
+};
+
+/* ============ 数据 & 渲染 ============ */
+let blocks = [];   // {id, type, data}
+let uid = 1;
+let caretBlockId = null;  // 光标所在块 id，用于"在光标处插入"
+
+function applyTheme(html, theme){
+  return html.replace(/\{\{(\w+)\}\}/g, (m,k)=> theme[k]!==undefined ? theme[k] : m);
+}
+function curFont(){ return document.getElementById('fontSize').value; }
+
+function renderBlockHTML(b){
+  let h = COMP[b.type].html(b.data);
+  h = h.replace(/\{\{fs\}\}/g, curFont());   // 正文字号变量
+  return applyTheme(h, THEMES[curTheme]);
+}
+
+function buildBlockNode(b){
+  const node = document.createElement('div');
+  node.className = 'block';
+  node.dataset.id = b.id;
+  node.dataset.type = b.type;
+  const tools = document.createElement('div');
+  tools.className = 'block-tools';
+  tools.innerHTML = `<button class="up" title="上移">↑</button><button class="down" title="下移">↓</button><button class="del" title="删除">✕</button>`;
+  const body = document.createElement('div');
+  body.className = 'block-body';
+  body.innerHTML = renderBlockHTML(b);
+  node.appendChild(tools); node.appendChild(body);
+  return node;
+}
+
+function fullRender(){
+  const canvas = document.getElementById('canvas');
+  if(blocks.length===0){
+    canvas.innerHTML = '<div class="phone-empty">从左侧点选组件开始编辑 👈<br>每块文字可直接点击修改<br>鼠标悬停块可 上移 / 下移 / 删除<br>也可「📥 导入MD」一键载入草稿</div>';
+  } else {
+    canvas.innerHTML = '';
+    blocks.forEach(b=> canvas.appendChild(buildBlockNode(b)));
+  }
+  updateCode();
+  updateWordCount();
+  save();
+}
+
+/* 在光标所在块之后插入；无光标则追加到末尾 */
+function insertAtCaret(bs){
+  let idx = blocks.length;
+  if(caretBlockId != null){
+    const ci = blocks.findIndex(x=> x.id === caretBlockId);
+    if(ci >= 0) idx = ci + 1;
+  }
+  blocks.splice(idx, 0, ...bs);
+}
+
+/* 插入组件（在光标处） */
+function addBlock(type){
+  pushHistory();
+  const def = JSON.parse(JSON.stringify(COMP[type].def||{}));
+  const b = { id: uid++, type, data: def };
+  insertAtCaret([b]);
+  fullRender();
+  const node = document.querySelector('#canvas .block[data-id="'+b.id+'"]');
+  if(node && node.scrollIntoView) node.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+/* 编辑保存：input 事件冒泡，读取 data-field */
+document.getElementById('canvas').addEventListener('input', e=>{
+  const f = e.target.closest('[data-field]');
+  if(!f) return;
+  const blockEl = e.target.closest('.block');
+  const b = blocks.find(x=> x.id == blockEl.dataset.id);
+  if(b) b.data[f.dataset.field] = f.innerHTML;
+  updateCode();
+  scheduleSnapshot();
+});
+
+/* 工具条：上移/下移/删除 */
+document.getElementById('canvas').addEventListener('click', e=>{
+  const btn = e.target.closest('.block-tools button');
+  if(!btn) return;
+  const blockEl = e.target.closest('.block');
+  const id = blockEl.dataset.id;
+  const idx = blocks.findIndex(x=> x.id == id);
+  if(btn.classList.contains('del')){ pushHistory(); blocks.splice(idx,1); blockEl.remove(); if(blocks.length===0) fullRender(); save(); updateWordCount(); }
+  else if(btn.classList.contains('up') && idx>0){ pushHistory(); [blocks[idx-1],blocks[idx]]=[blocks[idx],blocks[idx-1]]; fullRender(); }
+  else if(btn.classList.contains('down') && idx<blocks.length-1){ pushHistory(); [blocks[idx+1],blocks[idx]]=[blocks[idx],blocks[idx+1]]; fullRender(); }
+  updateCode();
+});
+
+/* ============ 历史（撤销 / 重做）============ */
+let history = [];   // 历史快照（blocks 的 JSON 字符串）
+let redoStack = []; // 重做栈
+let snapTimer = null;
+function pushHistory(){ history.push(JSON.stringify(blocks)); if(history.length>120) history.shift(); redoStack = []; }
+function scheduleSnapshot(){ clearTimeout(snapTimer); snapTimer = setTimeout(()=>{ pushHistory(); }, 800); }
+function undo(){ if(!history.length) return; redoStack.push(JSON.stringify(blocks)); blocks = JSON.parse(history.pop()); fullRender(); }
+function redo(){ if(!redoStack.length) return; history.push(JSON.stringify(blocks)); blocks = JSON.parse(redoStack.pop()); fullRender(); }
+
+/* ============ 自动保存 / 恢复（localStorage）============ */
+const LS_KEY = 'wechat-editor-v1';
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({ blocks, curTheme, title: document.getElementById('docTitle').value, fs: document.getElementById('fontSize').value })); }catch(e){} }
+function load(){ try{ const s = localStorage.getItem(LS_KEY); if(!s) return false; const o = JSON.parse(s); if(o.blocks && o.blocks.length){ blocks = o.blocks; curTheme = o.curTheme || 'moqing'; if(o.title) document.getElementById('docTitle').value = o.title; if(o.fs) document.getElementById('fontSize').value = o.fs; return true; } }catch(e){} return false; }
+
+/* ============ 实时字数 ============ */
+function updateWordCount(){ const tmp = document.createElement('div'); tmp.innerHTML = exportHTML(); const txt = (tmp.textContent||'').replace(/\s/g,''); document.getElementById('wordCount').textContent = txt.length + ' 字'; }
+
+/* ============ 导入 .md ============ */
+function inlineMd(s){ return (s||'')
+  .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+  .replace(/\*([^*\n]+)\*/g,'<em>$1</em>')
+  .replace(/`(.+?)`/g,'<code>$1</code>')
+  .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2">$1</a>'); }
+function parseMdToBlocks(text){
+  const lines = text.split(/\r?\n/); const out = [];
+  let para = [], quote = [], list = [];
+  const flushP = ()=>{ if(para.length){ out.push({type:'p', data:{t: inlineMd(para.join('\n'))}}); para=[]; } };
+  const flushQ = ()=>{ if(quote.length){ out.push({type:'quote', data:{t: inlineMd(quote.join('<br>')), s:''}}); quote=[]; } };
+  const flushL = ()=>{ if(list.length){ out.push({type:'checklist', data:{i: list.map(x=>'· '+inlineMd(x)).join('<br>')}}); list=[]; } };
+  for(let i=0;i<lines.length;i++){
+    const ln = lines[i];
+    if(/^\s*$/.test(ln)){ flushP(); flushQ(); flushL(); continue; }
+    const mImg = ln.match(/^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$/);
+    if(mImg){ flushP(); flushQ(); flushL(); out.push({type:'image', data:{cap: mImg[1]||'', src: mImg[2]}}); continue; }
+    const mH = ln.match(/^(#{1,6})\s+(.*)$/);
+    if(mH){ flushP(); flushQ(); flushL(); const lv=mH[1].length, txt=inlineMd(mH[2]);
+      if(lv===1) out.push({type:'banner', data:{k:'', t:txt}});
+      else if(lv===2) out.push({type:'h1', data:{t:txt}});
+      else out.push({type:'h2', data:{t:txt}});
+      continue; }
+    if(/^\s*(---|\*\*\*|___)\s*$/.test(ln)){ flushP(); flushQ(); flushL(); out.push({type:'divider', data:{}}); continue; }
+    const mQ = ln.match(/^\s*>\s?(.*)$/);
+    if(mQ){ quote.push(mQ[1]); continue; }
+    const mL = ln.match(/^\s*[-*+]\s+(.*)$/);
+    if(mL){ list.push(mL[1]); continue; }
+    para.push(ln);
+  }
+  flushP(); flushQ(); flushL();
+  return out;
+}
+
+/* ============ 导出 .md ============ */
+function stripHtml(html){ const t = document.createElement('div'); t.innerHTML = html||''; t.querySelectorAll('br').forEach(br=> br.replaceWith('\n')); return (t.textContent||'').trim(); }
+function exportMd(){
+  const map = {
+    banner: b=>`# ${stripHtml(b.data.t)}`, header: b=>`# ${stripHtml(b.data.t)}`,
+    h1: b=>`## ${stripHtml(b.data.t)}`, h2: b=>`### ${stripHtml(b.data.t)}`,
+    hbadge: b=>`## ${b.data.n}. ${stripHtml(b.data.t)}`,
+    p: b=>`${stripHtml(b.data.t)}`,
+    quote: b=>`> ${stripHtml(b.data.t)}${b.data.s?'\n> '+stripHtml(b.data.s):''}`,
+    quotebig: b=>`> ${stripHtml(b.data.t)}${b.data.s?'\n> '+stripHtml(b.data.s):''}`,
+    golden: b=>`> ${stripHtml(b.data.t)}`, goldencard: b=>`> ${stripHtml(b.data.t)}`, side: b=>`> ${stripHtml(b.data.t)}`,
+    think: b=>`> ${stripHtml(b.data.h)} ${stripHtml(b.data.t)}`,
+    checklist: b=>`${stripHtml(b.data.i).split('\n').map(x=>'- '+x.replace(/^·\s?/,'').trim()).join('\n')}`,
+    tags: b=>`\n${stripHtml(b.data.i)}`,
+    cta: b=>`\n[${stripHtml(b.data.t)}]`,
+    image: b=>`![${stripHtml(b.data.cap)}](${b.data.src||''})`,
+    series: b=>`**${stripHtml(b.data.h)}**\n${stripHtml(b.data.i)}`,
+    collection: b=>`**${stripHtml(b.data.h)}**\n${stripHtml(b.data.i)}`,
+    footer: b=>`---\n${stripHtml(b.data.n)}\n${stripHtml(b.data.s)}`,
+    declare: b=>`\n> ${stripHtml(b.data.t)}`,
+    stat: b=>`**${stripHtml(b.data.n)}** ${stripHtml(b.data.s)}`,
+    contrast: b=>`✕ ${stripHtml(b.data.w)}\n✓ ${stripHtml(b.data.r)}`,
+    steps: b=>`1. ${stripHtml(b.data.s1)}：${stripHtml(b.data.d1)}\n2. ${stripHtml(b.data.s2)}：${stripHtml(b.data.d2)}`,
+    icons: b=>`- ${stripHtml(b.data.t1)}：${stripHtml(b.data.c1)}\n- ${stripHtml(b.data.t2)}：${stripHtml(b.data.c2)}`,
+    triple: b=>`${stripHtml(b.data.n1)} ${stripHtml(b.data.s1)} / ${stripHtml(b.data.n2)} ${stripHtml(b.data.s2)} / ${stripHtml(b.data.n3)} ${stripHtml(b.data.s3)}`,
+    qa: b=>`**Q:** ${stripHtml(b.data.q)}\n**A:** ${stripHtml(b.data.a)}`,
+    tips: b=>`> [${stripHtml(b.data.l)}] ${stripHtml(b.data.t)}`,
+    infocard: b=>`**${stripHtml(b.data.t)}** ${stripHtml(b.data.c)}`,
+    code: b=>`\n\`\`\`\n${stripHtml(b.data.t)}\n\`\`\``,
+    timeline: b=>`- ${stripHtml(b.data.t1)}：${stripHtml(b.data.c1)}\n- ${stripHtml(b.data.t2)}：${stripHtml(b.data.c2)}`,
+    imgtext: b=>`**${stripHtml(b.data.t)}** ${stripHtml(b.data.c)}`,
+    divider: b=>`\n---\n`, line: b=>``,
+    header_cover: b=>`# ${stripHtml(b.data.t)}\n\n> ${stripHtml(b.data.k)} · ${stripHtml(b.data.meta)}`,
+    header_date: b=>`# ${stripHtml(b.data.t)}\n\n> [${stripHtml(b.data.cat)}] ${stripHtml(b.data.date)}`,
+    header_min: b=>`# ${stripHtml(b.data.t)}\n\n> ${stripHtml(b.data.sub)}`,
+    endcard: b=>`\n---\n**${stripHtml(b.data.t)}**\n${stripHtml(b.data.s)}`,
+    summary: b=>`**${stripHtml(b.data.h)}**\n${stripHtml(b.data.i)}`,
+    subscribe: b=>`> 📣 ${stripHtml(b.data.n)}：${stripHtml(b.data.s)}`,
+    likebar: b=>`\n[${stripHtml(b.data.l1)}] [${stripHtml(b.data.l2)}] [${stripHtml(b.data.l3)}] [${stripHtml(b.data.l4)}]`,
+    likebig: b=>`\n[${stripHtml(b.data.t)}]`,
+    reward: b=>`\n> ☕ ${stripHtml(b.data.t)}`,
+    h_underline: b=>`### ${stripHtml(b.data.t)}`,
+    h_fill: b=>`### ${stripHtml(b.data.t)}`,
+    h_tag: b=>`### ${stripHtml(b.data.t)}`,
+    h_dot: b=>`### ${stripHtml(b.data.t)}`,
+    h_number: b=>`### ${stripHtml(b.data.n)} ${stripHtml(b.data.t)}`,
+    h_gradient: b=>`### ${stripHtml(b.data.t)}`,
+    p_highlight: b=>`${stripHtml(b.data.t)}`,
+    p_center: b=>`> ${stripHtml(b.data.t)}`,
+    p_two: b=>`${stripHtml(b.data.t1)}\n${stripHtml(b.data.t2)}`,
+    quote_card: b=>`> ${stripHtml(b.data.t)}${b.data.s?'\n> '+stripHtml(b.data.s):''}`,
+    quote_center: b=>`> ${stripHtml(b.data.t)}${b.data.s?'\n> '+stripHtml(b.data.s):''}`,
+    quote_mark: b=>`> ${stripHtml(b.data.t)}`,
+    quote_color: b=>`> ${stripHtml(b.data.t)}${b.data.s?'\n> '+stripHtml(b.data.s):''}`,
+    card_shadow: b=>`**${stripHtml(b.data.t)}** ${stripHtml(b.data.c)}`,
+    card_round: b=>`**${stripHtml(b.data.t)}** ${stripHtml(b.data.c)}`,
+    card_icon: b=>`**${stripHtml(b.data.t)}** ${stripHtml(b.data.c)}`,
+    stat_grid: b=>`**${stripHtml(b.data.n1)}** ${stripHtml(b.data.s1)} / **${stripHtml(b.data.n2)}** ${stripHtml(b.data.s2)}`,
+    stat_big: b=>`**${stripHtml(b.data.n)}** ${stripHtml(b.data.s)}`,
+    stat_compare: b=>`${stripHtml(b.data.n1)} → ${stripHtml(b.data.n2)} ${stripHtml(b.data.s)}`,
+    list_num: b=>`${stripHtml(b.data.i)}`,
+    list_arrow: b=>`${stripHtml(b.data.i)}`,
+    list_circle: b=>`${stripHtml(b.data.i)}`,
+    list_step: b=>`${stripHtml(b.data.i)}`,
+    tips_solid: b=>`> [${stripHtml(b.data.l)}] ${stripHtml(b.data.t)}`,
+    note: b=>`> 📝 ${stripHtml(b.data.t)}`,
+    box_callout: b=>`> **${stripHtml(b.data.t)}**`,
+    pill: b=>`\n${stripHtml(b.data.i)}`,
+    badge_row: b=>`[${stripHtml(b.data.b1)}] [${stripHtml(b.data.b2)}] [${stripHtml(b.data.b3)}]`,
+    vote: b=>`**${stripHtml(b.data.q)}**\n- ${stripHtml(b.data.o1)}\n- ${stripHtml(b.data.o2)}\n- ${stripHtml(b.data.o3)}`,
+    qa_card: b=>`**Q:** ${stripHtml(b.data.q)}\n**A:** ${stripHtml(b.data.a)}`,
+    share_round: b=>`\n[↗ ${stripHtml(b.data.t)}]`,
+    progress: b=>`\n> ${stripHtml(b.data.t)} ${stripHtml(b.data.p)}`,
+    header_logo: b=>`# ${stripHtml(b.data.t)}\n> ${stripHtml(b.data.s)}`,
+    header_center: b=>`# ${stripHtml(b.data.t)}\n\n> ${stripHtml(b.data.k)} · ${stripHtml(b.data.sub)}`,
+    end_thanks: b=>`\n---\n**${stripHtml(b.data.t)}**\n${stripHtml(b.data.s)}`,
+    footer_line: b=>`---\n${stripHtml(b.data.n)}\n${stripHtml(b.data.s)}`,
+    author_card: b=>`> 👤 ${stripHtml(b.data.n)}：${stripHtml(b.data.r)}（${stripHtml(b.data.s)}）`,
+    img_full: b=>`![${stripHtml(b.data.cap)}](${b.data.src||''})`,
+    img_round: b=>`![${stripHtml(b.data.cap)}](${b.data.src||''})`,
+    img_cap: b=>`![${stripHtml(b.data.cap)}](${b.data.src||''})`
+  };
+  return blocks.map(b=>{ const fn=map[b.type]; return fn?fn(b):''; }).filter(Boolean).join('\n\n');
+}
+
+/* ============ 导出 / 复制 / 预览 ============ */
+function exportHTML(){
+  const title = document.getElementById('docTitle').value || '公众号文章';
+  let inner = blocks.map(b=>{
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderBlockHTML(b);
+    tmp.querySelectorAll('[contenteditable]').forEach(el=> el.removeAttribute('contenteditable'));
+    tmp.querySelectorAll('[data-field]').forEach(el=> el.removeAttribute('data-field'));
+    return tmp.innerHTML;
+  }).join('\n');
+  return `<!-- ${title} · 有一云风格 · 内联样式 -->\n${inner}`;
+}
+
+/* 包一层完整 HTML 文档，便于下载后独立打开预览 */
+function buildFullDoc(inner){
+  const title = document.getElementById('docTitle').value || '公众号文章';
+  return '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>'+title+'</title>\n<style>body{margin:0;background:#f2f4f5;padding:20px 0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;}</style>\n</head>\n<body>\n<div style="max-width:680px;margin:0 auto;background:#fff;padding:18px 16px;box-shadow:0 2px 12px rgba(0,0,0,.08);border-radius:10px;">\n'+inner+'\n</div>\n</body>\n</html>';
+}
+
+/* 通用可见反馈 */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=> t.classList.remove('show'), 2800);
+}
+
+function updateCode(){
+  document.getElementById('codeBox').textContent = blocks.length ? exportHTML() : '/* 添加组件后显示 */';
+}
+
+document.getElementById('btnCopy').onclick = ()=>{
+  if(!blocks.length){ toast('还没有内容，先添加组件或用智能排版'); return; }
+  navigator.clipboard.writeText(exportHTML()).then(()=> toast('已复制纯内联 HTML ✓ 可直接粘贴进公众号')).catch(()=> toast('复制失败，请在导出浮层里手动选择代码'));
+};
+/* 触发浏览器原生"保存"对话框（最稳的 file:// 下载方式） */
+function downloadFile(filename, content, mime){
+  const mimeType = mime || 'text/html;charset=utf-8';
+  /* 方案A：原生「另存为」对话框 —— Chrome 86+/Edge 86+ 可用 */
+  if(window.showSaveFilePicker){
+    const blob = new Blob([content], {type: mimeType});
+    window.showSaveFilePicker({
+      suggestedName: filename,
+      types: [{
+        description: filename.split('.').pop().toUpperCase() + ' file',
+        accept: { [mimeType.split(';')[0]]: ['.' + (filename.split('.').pop() || 'html')] }
+      }]
+    }).then(handle => handle.createWritable())
+      .then(w => w.write(blob).then(() => w.close()))
+      .then(() => toast('已保存：' + filename))
+      .catch(err => { if(err && err.name !== 'AbortError') toast('保存失败：' + (err.message||err)); });
+    return;
+  }
+  /* 方案B：data URL 回退 —— 不用 blob:，避免被 Windows 弹「打开 blob 应用」错误 */
+  try{
+    const url = 'data:' + mimeType + ',' + encodeURIComponent(content);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.rel = 'noopener';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ try{ document.body.removeChild(a); }catch(e){} }, 2000);
+    toast('已下载：' + filename);
+  }catch(e){
+    /* 方案C：新增窗口兜底，让用户 Ctrl+S */
+    const win = window.open('', '_blank');
+    if(win){
+      win.document.write('<!DOCTYPE html><meta charset="utf-8"><title>' + filename + '</title><pre style="white-space:pre-wrap;word-break:break-all;">' + (content.replace(/</g,'&lt;')) + '</pre>');
+      win.document.close();
+      toast('已开新窗口，请 Ctrl+S 另存为：' + filename);
+    }else{
+      toast('浏览器拦截了保存，请用「导出」浮层里的「复制 HTML」按钮');
+    }
+  }
+}
+
+document.getElementById('btnExport').onclick = ()=>{
+  if(!blocks.length){ toast('还没有内容，先添加组件或用智能排版'); return; }
+  document.getElementById('expCode').textContent = exportHTML();
+  document.getElementById('expMask').classList.add('show');
+  /* 同时直接触发保存对话框（用户手势内，浏览器允许弹出） */
+  const fn = (document.getElementById('docTitle').value || 'wechat-article') + '.html';
+  downloadFile(fn, buildFullDoc(exportHTML()), 'text/html;charset=utf-8');
+  toast('已弹出保存对话框：' + fn);
+};
+document.getElementById('btnPreview').onclick = ()=>{
+  if(!blocks.length){ toast('还没有内容，先添加组件或用智能排版'); return; }
+  const win = window.open('', '_blank');
+  if(!win){ toast('预览被浏览器拦截，请用「导出 HTML」浮层里的下载'); return; }
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>预览</title></head><body style="margin:0;background:#eee;display:flex;justify-content:center;"><div style="max-width:680px;width:100%;background:#fff;padding:18px;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">${exportHTML()}</div></body></html>`);
+};
+document.getElementById('btnClear').onclick = ()=>{ if(confirm('清空所有内容？（可点「↶ 撤销」恢复）')){ pushHistory(); blocks=[]; fullRender(); } };
+
+/* ============ 智能排版：页面内浮层收集输入，按黄金结构生成骨架 ============ */
+function openSmartModal(){
+  document.getElementById('smTitle').value  = document.getElementById('docTitle').value || '';
+  document.getElementById('smSub').value     = '';
+  document.getElementById('smPts').value     = '';
+  document.getElementById('smAuthor').value = '小芃';
+  document.getElementById('smTheme').value  = curTheme;
+  document.getElementById('smartMask').classList.add('show');
+  document.getElementById('smTitle').focus();
+}
+function closeSmartModal(){ document.getElementById('smartMask').classList.remove('show'); }
+
+function smartGenerate(){
+  const title  = document.getElementById('smTitle').value.trim()  || '我的公众号文章';
+  const sub    = document.getElementById('smSub').value.trim();
+  const raw    = document.getElementById('smPts').value.trim();
+  const author = document.getElementById('smAuthor').value.trim() || '小芃';
+  const theme  = document.getElementById('smTheme').value;
+  closeSmartModal();
+  document.getElementById('docTitle').value = title;
+
+  // 分点解析：支持 / 、 及换行
+  let pts = raw.split(/[\/\、\n]+/).map(s=>s.trim()).filter(Boolean);
+  while(pts.length < 3) pts.push('补充要点' + (pts.length + 1));
+  const p0 = pts[0], p1 = pts[1], p2 = pts[2];
+
+  // 主题：若与当前不同则切换并刷新主题卡
+  if(theme !== curTheme){ curTheme = theme; buildThemeList(); }
+
+  pushHistory();
+  blocks = [
+    { id:uid++, type:'header',  data:{ k: sub || (p0 + ' · 第 1 篇'), t: title } },
+    { id:uid++, type:'h1',      data:{ t:'为什么要看这篇' } },
+    { id:uid++, type:'p',       data:{ t:'先抛一个你或读者都熟悉的场景，引出「' + p0 + '」为什么值得花这几分钟。用第二人称"你"，别讲大道理——讲一个具体的、能共情的小麻烦。' } },
+    { id:uid++, type:'think',   data:{ h:'✋ 停下来想一想：', t:'你最近一次遇到跟「' + p0 + '」相关的问题，是怎么处理的？' } },
+    { id:uid++, type:'hbadge',  data:{ n:'1', t: p0 } },
+    { id:uid++, type:'steps',   data:{ s1:'第一步', d1:'用最白的话讲清核心做法，配一个生活里的例子。', s2:'第二步', d2:'说清什么时候用、为什么有效，给读者一个能马上试的动作。' } },
+    { id:uid++, type:'stat',    data:{ n:'3 步', s:'把复杂的事拆成最小可执行的步骤，读者照做就能上手' } },
+    { id:uid++, type:'h1',      data:{ t:'常见误区' } },
+    { id:uid++, type:'contrast',data:{ w:'误区：看懂了就以为会了，直接去用，结果卡住。', r:'正确：先在小场景里试一遍，跑不通的地方，就是你要补的知识点。' } },
+    { id:uid++, type:'think',   data:{ h:'✋ 再想想：', t:'你上次的"看懂"，是真懂还是假懂？' } },
+    { id:uid++, type:'hbadge',  data:{ n:'2', t: p1 } },
+    { id:uid++, type:'icons',   data:{ e1:'📌', t1:'先讲简单的', c1:'建立信心，别一上来就啃最难的部分。', e2:'💡', t2:'真问为什么', c2:'每讲一点，追问一句"为什么是这样"，讲到能举例为止。' } },
+    { id:uid++, type:'quotebig',data:{ t:'把复杂的事讲简单，才是真懂了。别用术语掩盖不懂。', s:'—— 把你想让记得的一句话写在这' } },
+    { id:uid++, type:'golden',  data:{ t:'"把上面最想让读者记住的一句话，写在这里。"' } },
+    { id:uid++, type:'think',   data:{ h:'✋ 最后一个问题：', t:'今天这点，今晚能讲给家人 / 朋友听一遍吗？' } },
+    { id:uid++, type:'hbadge',  data:{ n:'3', t: p2 } },
+    { id:uid++, type:'p',       data:{ t:'回到「' + p2 + '」：方法不复杂，难的是每次都逼自己用一遍。从下一个场景开始试试，讲不通的地方，就是你需要补的地方。' } },
+    { id:uid++, type:'cta',     data:{ t:'点个「在看」鼓励一下 →' } },
+    { id:uid++, type:'tags',    data:{ i:'#' + title.replace(/\s/g,'') + ' #学习方法 #知识科普' } },
+    { id:uid++, type:'footer',  data:{ n:'我是 ' + author, s:'专注 知识分享，关注我，一起把知识学扎实' } },
+    { id:uid++, type:'likebar', data:{ l1:'👍 点赞', l2:'⭐ 在看', l3:'🔖 收藏', l4:'↗ 分享' } },
+    { id:uid++, type:'subscribe', data:{ n:'公众号名字', s:'专注 知识分享，关注我，每周更新一篇干货。' } },
+    { id:uid++, type:'declare', data:{ t:'本文为个人经验整理，仅供参考。内容如有不严谨之处，欢迎评论区指正。' } }
+  ];
+  fullRender();
+  document.getElementById('canvas').scrollTop = 0;
+  setTimeout(()=> alert('已生成完整骨架 ✓\n按黄金结构排版：强开头 → 知识点(步骤/数据/对比) → 三次互动 → 金句 → 结尾引导。\n现在点击任意文字块直接改内容即可。'), 100);
+}
+document.getElementById('btnSmart').onclick  = openSmartModal;
+document.getElementById('smCancel').onclick  = closeSmartModal;
+document.getElementById('smGen').onclick      = smartGenerate;
+document.getElementById('smartMask').addEventListener('click', e=>{ if(e.target.id==='smartMask') closeSmartModal(); });
+
+/* 主题切换 */
+function buildThemeList(){
+  const box = document.getElementById('themeList');
+  box.innerHTML='';
+  Object.entries(THEMES).forEach(([k,v])=>{
+    const c = document.createElement('div');
+    c.className = 'theme-card' + (k===curTheme?' active':'');
+    c.dataset.k = k;
+    c.innerHTML = `<div class="name">${v.name}</div><div class="desc">${v.desc}</div>
+      <div class="row"><span class="sw" style="background:${v.primary}"></span><span class="sw" style="background:${v.accent}"></span><span class="sw" style="background:${v.bg}"></span><span class="sw" style="background:${v.tag_bg}"></span></div>`;
+    c.onclick = ()=>{ curTheme=k; buildThemeList(); fullRender(); };
+    box.appendChild(c);
+  });
+}
+
+/* 字号切换重渲染正文 */
+document.getElementById('fontSize').onchange = ()=> fullRender();
+
+/* 组件库面板 */
+(function buildLib(){
+  const lib = document.getElementById('compLib');
+  const groups = {};
+  Object.entries(COMP).forEach(([k,v])=>{ (groups[v.g]=groups[v.g]||[]).push([k,v]); });
+  Object.entries(groups).forEach(([g, items])=>{
+    const h = document.createElement('div'); h.className='comp-group-h'; h.textContent=g; lib.appendChild(h);
+    items.forEach(([k,v])=>{
+      const b = document.createElement('button'); b.className='comp-btn';
+      b.innerHTML = `<span class="ico">${v.ico}</span><span>${v.label}</span>`;
+      b.onclick = ()=> (k==='image' ? document.getElementById('fileImg').click() : addBlock(k));
+      lib.appendChild(b);
+    });
+  });
+})();
+
+buildThemeList();
+
+/* ============ 撤销 / 重做 / 导入 / 导出MD 绑定 ============ */
+document.getElementById('btnUndo').onclick = ()=> undo();
+document.getElementById('btnRedo').onclick = ()=> redo();
+document.getElementById('btnImportMd').onclick = ()=> document.getElementById('fileMd').click();
+document.getElementById('btnImportImg').onclick = ()=> document.getElementById('fileImg').click();
+document.getElementById('btnExportMd').onclick = ()=>{
+  if(!blocks.length){ toast('还没有内容'); return; }
+  const fn = (document.getElementById('docTitle').value||'wechat-article') + '.md';
+  downloadFile(fn, exportMd(), 'text/markdown;charset=utf-8');
+};
+
+/* 导出浮层按钮 */
+document.getElementById('expClose').onclick = ()=> document.getElementById('expMask').classList.remove('show');
+document.getElementById('expCopy').onclick = ()=>{
+  navigator.clipboard.writeText(exportHTML()).then(()=> toast('已复制纯内联 HTML ✓')).catch(()=> toast('复制失败，请手动选择代码'));
+};
+document.getElementById('expDl').onclick = ()=>{
+  const fn = (document.getElementById('docTitle').value || 'wechat-article') + '.html';
+  downloadFile(fn, buildFullDoc(exportHTML()), 'text/html;charset=utf-8');
+  toast('已弹出保存对话框：' + fn);
+};
+/* 点击遮罩关闭浮层 */
+document.getElementById('expMask').addEventListener('click', e=>{ if(e.target===document.getElementById('expMask')) document.getElementById('expMask').classList.remove('show'); });
+document.getElementById('smartMask').addEventListener('click', e=>{ if(e.target===document.getElementById('smartMask')) document.getElementById('smartMask').classList.remove('show'); });
+
+/* ============ 选区格式工具条（字号 / 字体色 / 背景色 / 清除）============ */
+const SW_COLORS = ['#333333','#666666','#999999','#1E7B6B','#C07A2B','#E54D42','#2B6CB0','#6B5CE7','#3E9B7A','#FFFFFF'];
+document.getElementById('selSwatches').innerHTML = SW_COLORS.map(c=> `<div class="sw" data-c="${c}" style="background:${c}" title="${c}"></div>`).join('');
+
+let lastRange = null;
+function restoreRange(){ if(lastRange && window.getSelection){ const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(lastRange); } }
+function hideSelBar(){ document.getElementById('selBar').classList.remove('show'); document.getElementById('selPalette').classList.remove('show'); }
+
+let selbarInteract = false;
+document.addEventListener('mousedown', e=>{ if(e.target.closest('#selBar')) selbarInteract = true; });
+document.addEventListener('mouseup', ()=> setTimeout(()=> selbarInteract = false, 0));
+
+document.addEventListener('selectionchange', ()=>{
+  const sel = window.getSelection();
+  if(!sel || !sel.rangeCount) return;
+  const cv = document.getElementById('canvas');
+  const r = sel.getRangeAt(0);
+
+  /* 记录光标所在块，用于"在光标处插入" */
+  if(cv.contains(r.commonAncestorContainer)){
+    const node = (r.commonAncestorContainer.nodeType === 1) ? r.commonAncestorContainer : r.commonAncestorContainer.parentNode;
+    const blk = node.closest && node.closest('.block');
+    if(blk) caretBlockId = parseInt(blk.dataset.id);
+  }
+
+  /* 选中文字且选区在画布内 → 保存选区 + 显示工具条 */
+  if(!sel.isCollapsed && cv.contains(r.commonAncestorContainer)){
+    lastRange = r.cloneRange();
+    const bar = document.getElementById('selBar');
+    bar.classList.add('show');
+    /* getBoundingClientRect 在个别环境缺失，做保护避免整段逻辑中断 */
+    if(r.getBoundingClientRect && bar.getBoundingClientRect){
+      const rect = r.getBoundingClientRect();
+      let top = rect.top - bar.offsetHeight - 8;
+      if(top < 8) top = rect.bottom + 8;
+      bar.style.left = Math.max(8, rect.left + rect.width/2 - bar.offsetWidth/2) + 'px';
+      bar.style.top = top + 'px';
+    }
+    return;
+  }
+  /* 折叠（无选区）：仅在画布内点击别处时隐藏工具条；与工具条交互时保持显示 */
+  if(sel.isCollapsed){
+    if(cv.contains(r.commonAncestorContainer) && !selbarInteract) hideSelBar();
+    return;
+  }
+  /* 选区在画布外 */
+  hideSelBar();
+});
+
+/* 选区格式只改 DOM，需把 [data-field] 的 innerHTML 回写进 blocks（否则换肤/撤销会丢） */
+function syncCanvasFields(){
+  document.querySelectorAll('#canvas .block').forEach(node=>{
+    const b = blocks.find(x=> x.id == node.dataset.id);
+    if(!b) return;
+    node.querySelectorAll('[data-field]').forEach(f=>{
+      if(b.data[f.dataset.field] !== undefined) b.data[f.dataset.field] = f.innerHTML;
+    });
+  });
+}
+function afterFormat(){ syncCanvasFields(); updateCode(); updateWordCount(); save(); scheduleSnapshot(); }
+
+/* 把选中内容用指定样式包裹成 <span>（内联样式，微信可保留）。
+   不用 execCommand，避免各浏览器对 foreColor/hiliteColor/fontSize 支持不一致导致"没反应"。 */
+function wrapSelection(setStyle){
+  restoreRange();
+  const sel = window.getSelection();
+  if(!sel || !sel.rangeCount || sel.isCollapsed){ toast('请先选中要设置的文字'); return; }
+  const range = sel.getRangeAt(0);
+  const span = document.createElement('span');
+  setStyle(span);
+  let frag;
+  try { frag = range.extractContents(); }
+  catch(e){ frag = range.cloneContents(); range.deleteContents(); }
+  span.appendChild(frag);
+  range.insertNode(span);
+  afterFormat();
+}
+function applyFontSize(px){
+  const n = parseInt(px, 10);
+  wrapSelection(sp => sp.style.fontSize = n + 'px');
+}
+function applyColor(kind, color){
+  if(kind === 'color') wrapSelection(sp => sp.style.color = color);
+  else wrapSelection(sp => sp.style.background = color);
+}
+function clearFormat(){
+  restoreRange();
+  const sel = window.getSelection();
+  if(!sel || !sel.rangeCount || sel.isCollapsed){ toast('请先选中要设置的文字'); return; }
+  const range = sel.getRangeAt(0);
+  const span = document.createElement('span'); span.className = '__fmt__';
+  let frag;
+  try { frag = range.extractContents(); }
+  catch(e){ frag = range.cloneContents(); range.deleteContents(); }
+  span.appendChild(frag);
+  range.insertNode(span);
+  /* 去掉包裹内所有内联格式，并拆掉空的 span */
+  span.querySelectorAll('*').forEach(el=>{
+    el.style.fontSize = ''; el.style.color = ''; el.style.background = '';
+  });
+  const parent = span.parentNode;
+  while(span.firstChild) parent.insertBefore(span.firstChild, span);
+  parent.removeChild(span);
+  afterFormat();
+}
+
+document.getElementById('selFs').addEventListener('change', e=> applyFontSize(e.target.value));
+document.getElementById('selColor').onclick = ()=> openPalette('color');
+document.getElementById('selBg').onclick = ()=> openPalette('bg');
+document.getElementById('selClear').onclick = ()=> clearFormat();
+
+let paletteMode = 'color';
+function openPalette(mode){
+  paletteMode = mode;
+  const p = document.getElementById('selPalette');
+  const already = p.classList.contains('show');
+  if(already && p.dataset.mode===mode){ p.classList.remove('show'); return; }
+  document.getElementById('selModeLabel').textContent = mode==='color' ? '字体颜色' : '背景颜色';
+  p.dataset.mode = mode; p.classList.add('show');
+  const bar = document.getElementById('selBar'); const r = bar.getBoundingClientRect();
+  p.style.left = r.left + 'px'; p.style.top = (r.bottom + 8) + 'px';
+}
+document.getElementById('selSwatches').addEventListener('click', e=>{
+  const sw = e.target.closest('.sw'); if(!sw) return;
+  applyColor(paletteMode, sw.dataset.c);
+  document.getElementById('selPalette').classList.remove('show');
+});
+document.getElementById('selCust').addEventListener('input', e=> applyColor(paletteMode, e.target.value));
+document.addEventListener('mousedown', e=>{
+  if(e.target.closest('#selPalette') || e.target.closest('#selColor') || e.target.closest('#selBg')) return;
+  document.getElementById('selPalette').classList.remove('show');
+});
+
+/* 导入 .md：解析为组件块（空画布则替换，否则追加） */
+document.getElementById('fileMd').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    const blk = parseMdToBlocks(r.result);
+    if(!blk.length){ alert('未解析到内容'); e.target.value=''; return; }
+    pushHistory();
+    if(blocks.length===0){ blocks = blk; } else { blocks = blocks.concat(blk); }
+    blocks.forEach(b=> b.id = uid++);
+    fullRender();
+    setTimeout(()=> alert('已导入 '+blk.length+' 个块 ✓\n（若画布原有内容，已追加在末尾）\n图片若用相对路径，请在编辑器里用「插图片」替换。'), 80);
+  };
+  r.readAsText(f); e.target.value='';
+});
+
+/* 插入图片：多选本地图转 base64，在光标处逐张插入 image 块 */
+document.getElementById('fileImg').addEventListener('change', e=>{
+  const files = [...e.target.files]; if(!files.length) return;
+  pushHistory();
+  const bs = [];
+  let pending = files.length;
+  files.forEach(f=>{
+    const r = new FileReader();
+    r.onload = ()=>{
+      bs.push({ id: uid++, type:'image', data:{ cap: f.name.replace(/\.[^.]+$/,''), src: r.result } });
+      if(--pending===0){ insertAtCaret(bs); fullRender(); }
+    };
+    r.readAsDataURL(f);
+  });
+  e.target.value='';
+});
+
+/* 快捷键：Ctrl/Cmd + Z 撤销，Ctrl/Cmd + Y 或 Shift+Z 重做 */
+document.addEventListener('keydown', e=>{
+  if(!(e.ctrlKey||e.metaKey)) return;
+  const k = e.key.toLowerCase();
+  if(k==='z' && !e.shiftKey){ e.preventDefault(); undo(); }
+  else if(k==='y' || (k==='z' && e.shiftKey)){ e.preventDefault(); redo(); }
+});
+
+/* ============ 启动：优先恢复自动保存 ============ */
+if(load()){
+  buildThemeList();
+  fullRender();
+  setTimeout(()=> alert('已恢复上次自动保存的内容 ✓\n（点「↶ 撤销」可回溯更早版本）'), 150);
+} else {
+  fullRender();
+}
+</script>
+</body>
+</html>

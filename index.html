@@ -28,7 +28,7 @@
   .layout { flex: 1; display: flex; min-height: 0; }
   .panel-l, .panel-r { width: 240px; background: #fff; overflow-y: auto; border-right: 1px solid #e6e8eb; }
   .panel-r { border-right: none; border-left: 1px solid #e6e8eb; }
-  .canvas-wrap { flex: 1; overflow-y: auto; padding: 22px; display: flex; justify-content: center; }
+  .canvas-wrap { flex: 1; overflow: hidden; padding: 22px; display: flex; justify-content: center; align-items: flex-start; }
 
   .panel-title { font-size: 12px; font-weight: 700; color: #999; padding: 14px 14px 8px; letter-spacing: .5px; }
   .comp-group { margin-bottom: 6px; }
@@ -38,9 +38,11 @@
   .comp-btn .ico { font-size: 15px; }
 
   /* 画布（手机预览） */
-  .phone { width: 380px; min-height: 600px; background: #fff; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,.08); padding: 16px; }
+  .phone { width: 380px; min-height: 600px; max-height: 100%; overflow-y: auto; background: #fff; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,.08); padding: 16px; }
   .phone-empty { color: #bbb; text-align: center; padding: 80px 20px; font-size: 13px; line-height: 1.8; }
   .block { position: relative; }
+  .block img { cursor: pointer; }
+  .block img:hover { outline: 2px dashed rgba(30,123,107,.7); outline-offset: 2px; }
   .block-tools { position: absolute; right: 2px; top: 2px; display: none; gap: 4px; z-index: 5; }
   .block:hover .block-tools { display: flex; }
   .block-tools button { width: 24px; height: 24px; border: none; border-radius: 5px; background: rgba(30,123,107,.92); color: #fff; font-size: 12px; cursor: pointer; line-height: 1; }
@@ -219,6 +221,12 @@ const THEMES = {
 };
 let curTheme = 'moqing';
 
+/* 图片占位图：未载入图片时显示，点击即可更新（data:image/svg+xml） */
+function phSvg(text, w, h){
+  const fs = Math.max(11, Math.round(Math.min(w, h) / 4.5));
+  return "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='"+w+"' height='"+h+"'><rect width='100%' height='100%' fill='%23f2f4f5'/><text x='50%' y='50%' font-size='"+fs+"' fill='%23999' text-anchor='middle' dominant-baseline='middle'>"+text+"</text></svg>";
+}
+
 /* ============ 组件库（render 返回带占位符 + contenteditable 的内联 HTML） ============ */
 /* 约定：可编辑文本用 <span data-field="x" contenteditable="true">默认</span>，
    导出时移除 contenteditable/data-field，并把 {{占位符}} 替换为主题色。*/
@@ -275,16 +283,17 @@ const COMP = {
     html:d=>`<section style="margin:22px 0;padding:16px;background:{{bg}};border-radius:10px;border:1px solid {{border}};">
   <span data-field="h" contenteditable="true" style="display:block;font-size:14px;font-weight:bold;color:{{primary}};margin-bottom:10px;">${d.h}</span>
   <p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.9;margin:0;">${d.i}</p></section>` },
-  subscribe:{ g:'框架', ico:'➕', label:'关注引导卡', def:{n:'公众号名字', s:'一句价值主张，为什么值得关注。'},
-    html:d=>`<section style="margin:22px 0;padding:18px;background:{{primary_grad}};border-radius:12px;display:flex;align-items:center;">
+  subscribe:{ g:'框架', ico:'➕', label:'关注引导卡', def:{n:'公众号名字', s:'一句价值主张，为什么值得关注。', qr:''},
+    html:d=>{ const qrph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='100%' height='100%' fill='%23fff'/><text x='50%' y='50%' font-size='11' fill='%23999' text-anchor='middle' dominant-baseline='middle'>二维码</text></svg>"; return `<section style="margin:22px 0;padding:18px;background:{{primary_grad}};border-radius:12px;display:flex;align-items:center;">
   <div style="flex:1;">
     <span data-field="n" contenteditable="true" style="display:block;font-size:16px;font-weight:bold;color:#FFFFFF;">${d.n}</span>
     <span data-field="s" contenteditable="true" style="display:block;font-size:13px;color:rgba(255,255,255,.9);margin-top:4px;line-height:1.5;">${d.s}</span>
   </div>
-  <section style="width:64px;height:64px;background:#FFFFFF;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:{{text_sub}};margin-left:12px;flex-shrink:0;">二维码</section></section>` },
-  header_logo:{ g:'框架', ico:'🔵', label:'带Logo头', def:{logo:'LOGO', t:'公众号名称', s:'一句 slogan'},
+  <section style="width:64px;height:64px;background:#FFFFFF;border-radius:8px;margin-left:12px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+  <img src="${d.qr||qrph}" data-imgfield="qr" style="width:100%;height:100%;object-fit:cover;cursor:pointer;" title="点击载入/更新二维码"></section></section>`; } },
+  header_logo:{ g:'框架', ico:'🔵', label:'带Logo头', def:{logoImg:'', t:'公众号名称', s:'一句 slogan'},
     html:d=>`<section style="margin:0 0 20px 0;display:flex;align-items:center;padding-bottom:14px;border-bottom:1px solid {{border}};">
-  <span style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;background:{{primary_grad}};color:#FFFFFF;border-radius:10px;font-size:13px;font-weight:bold;margin-right:12px;">${d.logo}</span>
+  <img src="${d.logoImg||d.src||phSvg('LOGO',40,40)}" data-imgfield="logoImg" title="点击载入/更新 Logo" style="width:40px;height:40px;object-fit:cover;border-radius:10px;margin-right:12px;cursor:pointer;flex-shrink:0;">
   <span style="display:block;"><span data-field="t" contenteditable="true" style="display:block;font-size:16px;font-weight:bold;color:{{text}};">${d.t}</span>
   <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};">${d.s}</span></span></section>` },
   header_center:{ g:'框架', ico:'🔆', label:'居中头', def:{k:'栏目名', t:'文章标题', sub:'副标题一句话'},
@@ -300,9 +309,9 @@ const COMP = {
     html:d=>`<section style="margin:20px 0 0 0;padding-top:14px;border-top:1px solid {{border}};text-align:center;">
   <span data-field="n" contenteditable="true" style="font-size:13px;font-weight:bold;color:{{primary}};">${d.n}</span>
   <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:4px;">${d.s}</span></section>` },
-  author_card:{ g:'框架', ico:'👤', label:'作者卡片', def:{n:'[作者名]', r:'[头衔 / 一句话简介]', s:'[专注领域]'},
+  author_card:{ g:'框架', ico:'👤', label:'作者卡片', def:{avatar:'', n:'[作者名]', r:'[头衔 / 一句话简介]', s:'[专注领域]'},
     html:d=>`<section style="margin:20px 0;padding:14px 16px;background:{{tag_bg}};border-radius:10px;display:flex;align-items:center;">
-  <span style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;background:{{primary_grad}};color:#FFFFFF;border-radius:50%;font-size:18px;margin-right:12px;">👤</span>
+  <img src="${d.avatar||d.src||phSvg('头像',44,44)}" data-imgfield="avatar" title="点击载入/更新头像" style="width:44px;height:44px;object-fit:cover;border-radius:50%;margin-right:12px;cursor:pointer;flex-shrink:0;">
   <span style="display:block;"><span data-field="n" contenteditable="true" style="display:block;font-size:14px;font-weight:bold;color:{{primary}};">${d.n}</span>
   <span data-field="r" contenteditable="true" style="display:block;font-size:12px;color:{{text}};margin-top:2px;">${d.r}</span>
   <span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:2px;">${d.s}</span></span></section>` },
@@ -451,10 +460,10 @@ const COMP = {
   code: { g:'重点块', ico:'</>', label:'代码块', def:{t:'var a = 1;<br>var b = 2;<br>console.log(a + b);'},
     html:d=>`<section style="margin:14px 0;padding:12px 14px;background:#2B2B2B;border-radius:8px;">
   <span data-field="t" contenteditable="true" style="display:block;font-family:Consolas,Menlo,monospace;font-size:13px;color:#E6E6E6;line-height:1.7;white-space:pre;">${d.t}</span></section>` },
-  imgtext:{ g:'重点块', ico:'🖼', label:'图文卡', def:{t:'案例标题', c:'一句话讲清这个案例说明什么，给读者启发。'},
+  imgtext:{ g:'重点块', ico:'🖼', label:'图文卡', def:{img:'', t:'案例标题', c:'一句话讲清这个案例说明什么，给读者启发。'},
     html:d=>`<table style="width:100%;border-collapse:separate;border-spacing:0;margin:16px 0;table-layout:fixed;">
 <tr><td style="width:34%;padding:0;vertical-align:middle;">
-  <section style="height:96px;background:{{primary_grad}};border-radius:8px 0 0 8px;display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-size:13px;">图片占位</section>
+  <img src="${d.img||d.src||phSvg('图片',200,96)}" data-imgfield="img" title="点击载入/更新图片" style="display:block;width:100%;height:96px;object-fit:cover;border-radius:8px 0 0 8px;cursor:pointer;">
 </td><td style="width:66%;padding:12px 14px;background:{{bg}};border-radius:0 8px 8px 0;vertical-align:middle;">
   <span data-field="t" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};">${d.t}</span>
   <p data-field="c" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.6;margin:4px 0 0;">${d.c}</p>
@@ -542,11 +551,11 @@ const COMP = {
   likebig:{ g:'互动', ico:'❤', label:'点赞大按钮', def:{t:'❤️ 点赞支持'},
     html:d=>`<section style="margin:22px 0;text-align:center;">
   <span data-field="t" contenteditable="true" style="display:inline-flex;align-items:center;gap:8px;padding:12px 34px;background:{{bg}};border:1.5px solid {{primary}};color:{{primary}};border-radius:28px;font-size:16px;font-weight:bold;">${d.t}</span></section>` },
-  reward:{ g:'互动', ico:'☕', label:'赞赏卡片', def:{t:'觉得有用，赏杯咖啡 ☕'},
+  reward:{ g:'互动', ico:'☕', label:'赞赏卡片', def:{pay:'', t:'觉得有用，赏杯咖啡 ☕'},
     html:d=>`<section style="margin:22px 0;text-align:center;padding:18px;background:{{tag_bg}};border-radius:12px;">
   <span style="display:block;font-size:26px;">☕</span>
   <span data-field="t" contenteditable="true" style="display:block;font-size:14px;font-weight:bold;color:{{primary}};margin:8px 0 10px;">${d.t}</span>
-  <section style="width:80px;height:80px;background:#FFFFFF;border:1px dashed {{primary}};border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:{{text_sub}};">赞赏码</section></section>` },
+  <img src="${d.pay||d.src||phSvg('赞赏码',80,80)}" data-imgfield="pay" title="点击载入/更新赞赏码" style="width:80px;height:80px;object-fit:cover;background:#fff;border:1px dashed {{primary}};border-radius:8px;cursor:pointer;"></section>` },
   vote:{ g:'互动', ico:'🗳', label:'投票条', def:{q:'你觉得哪一点最有用？', o1:'A 方法', o2:'B 案例', o3:'C 工具'},
     html:d=>`<section style="margin:18px 0;padding:14px;background:{{bg}};border-radius:10px;">
   <span data-field="q" contenteditable="true" style="display:block;font-size:14px;font-weight:bold;color:{{primary}};margin-bottom:10px;">${d.q}</span>
@@ -571,14 +580,16 @@ const COMP = {
   image:{ g:'媒体', ico:'🖼', label:'图片块', def:{cap:'图注（可留空）', src:''},
     html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>";
       const src = d.src || ph;
-      return `<section style="margin:16px 0;"><img src="${src}" style="display:block;width:100%;border-radius:8px;max-height:420px;object-fit:cover;">${d.cap?`<span data-field="cap" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};text-align:center;margin-top:6px;">${d.cap}</span>`:''}</section>`; } },
+      return `<section style="margin:16px 0;"><img src="${src}" data-imgfield="src" title="点击更新图片" style="display:block;width:100%;border-radius:8px;max-height:420px;object-fit:cover;">${d.cap?`<span data-field="cap" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};text-align:center;margin-top:6px;">${d.cap}</span>`:''}</section>`; } },
   img_full:{ g:'媒体', ico:'🖼', label:'全宽图', def:{cap:'图注（可留空）', src:''},
-    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;"><img src="${src}" style="display:block;width:100%;border-radius:4px;max-height:460px;object-fit:cover;">${d.cap?`<span data-field="cap" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};text-align:center;margin-top:6px;">${d.cap}</span>`:''}</section>`; } },
+    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;"><img src="${src}" data-imgfield="src" title="点击更新图片" style="display:block;width:100%;border-radius:4px;max-height:460px;object-fit:cover;">${d.cap?`<span data-field="cap" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};text-align:center;margin-top:6px;">${d.cap}</span>`:''}</section>`; } },
   img_round:{ g:'媒体', ico:'⭕', label:'圆角大图', def:{cap:'图注（可留空）', src:''},
-    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;"><img src="${src}" style="display:block;width:100%;border-radius:16px;max-height:420px;object-fit:cover;">${d.cap?`<span data-field="cap" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};text-align:center;margin-top:6px;">${d.cap}</span>`:''}</section>`; } },
+    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;"><img src="${src}" data-imgfield="src" title="点击更新图片" style="display:block;width:100%;border-radius:16px;max-height:420px;object-fit:cover;">${d.cap?`<span data-field="cap" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};text-align:center;margin-top:6px;">${d.cap}</span>`:''}</section>`; } },
   img_cap:{ g:'媒体', ico:'🏞', label:'图注卡', def:{cap:'图片说明一句话', src:''},
-    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;background:{{bg}};border-radius:12px;overflow:hidden;"><img src="${src}" style="display:block;width:100%;max-height:300px;object-fit:cover;">${d.cap?`<p data-field="cap" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.6;padding:10px 14px;margin:0;">${d.cap}</p>`:''}</section>`; } }
+    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;background:{{bg}};border-radius:12px;overflow:hidden;"><img src="${src}" data-imgfield="src" title="点击更新图片" style="display:block;width:100%;max-height:300px;object-fit:cover;">${d.cap?`<p data-field="cap" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.6;padding:10px 14px;margin:0;">${d.cap}</p>`:''}</section>`; } }
 ,
+  qrcode:{ g:'互动', ico:'🔳', label:'二维码', def:{tip:'长按识别 / 扫码关注', src:''},
+    html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><rect width='100%' height='100%' fill='%23fff'/><rect x='18' y='18' width='124' height='124' fill='none' stroke='%23ddd'/><text x='50%' y='50%' font-size='13' fill='%23999' text-anchor='middle' dominant-baseline='middle'>点击载入二维码</text></svg>"; const src=d.src||ph; return `<section style="margin:18px 0;text-align:center;"><img src="${src}" style="width:150px;height:150px;object-fit:contain;background:#fff;border:1px solid {{border}};border-radius:12px;cursor:pointer;" title="点击载入/更新二维码"><p data-field="tip" contenteditable="true" style="font-size:13px;color:{{text_sub}};margin:8px 0 0;">${d.tip}</p></section>`; } } ,
   table:{ g:'表格', ico:'▦', label:'表格', def:{headers:['项目','说明','示例'], rows:[['核心概念','一句话讲清是什么','分形'],['应用场景','能解决什么问题','海岸线长度'],['关键数据','支撑结论的数字','维数 1.26']], align:['left','left','left']},
     html:d=>{
       const hdr=(d.headers||[]).map((h,i)=>`<th style="padding:9px 12px;border:1px solid {{border}};background:{{tag_bg}};color:{{text}};font-weight:700;text-align:${(d.align&&d.align[i])||'left'};font-size:{{fs}};">${h}</th>`).join('');
@@ -592,6 +603,8 @@ const COMP = {
 let blocks = [];   // {id, type, data}
 let uid = 1;
 let caretBlockId = null;  // 光标所在块 id，用于"在光标处插入"
+let pendingImgTargetId = null;   // 点击图片"更新"时的目标块 id（null=插入模式）
+let pendingImgField = 'src';     // 目标块要写入的图片字段名（subscribe=qr，其余=src）
 
 function applyTheme(html, theme){
   return html.replace(/\{\{(\w+)\}\}/g, (m,k)=> theme[k]!==undefined ? theme[k] : m);
@@ -766,6 +779,7 @@ function exportMd(){
     tags: b=>`\n${stripHtml(b.data.i)}`,
     cta: b=>`\n[${stripHtml(b.data.t)}]`,
     image: b=>`![${stripHtml(b.data.cap)}](${b.data.src||''})`,
+    qrcode: b=>`![${stripHtml(b.data.tip)}](${b.data.src||''})`,
     series: b=>`**${stripHtml(b.data.h)}**\n${stripHtml(b.data.i)}`,
     collection: b=>`**${stripHtml(b.data.h)}**\n${stripHtml(b.data.i)}`,
     footer: b=>`---\n${stripHtml(b.data.n)}\n${stripHtml(b.data.s)}`,
@@ -787,7 +801,7 @@ function exportMd(){
     header_min: b=>`# ${stripHtml(b.data.t)}\n\n> ${stripHtml(b.data.sub)}`,
     endcard: b=>`\n---\n**${stripHtml(b.data.t)}**\n${stripHtml(b.data.s)}`,
     summary: b=>`**${stripHtml(b.data.h)}**\n${stripHtml(b.data.i)}`,
-    subscribe: b=>`> 📣 ${stripHtml(b.data.n)}：${stripHtml(b.data.s)}`,
+    subscribe: b=>`> 📣 ${stripHtml(b.data.n)}：${stripHtml(b.data.s)}${b.data.qr?'\n> ![]('+b.data.qr+')':''}`,
     likebar: b=>`\n[${stripHtml(b.data.l1)}] [${stripHtml(b.data.l2)}] [${stripHtml(b.data.l3)}] [${stripHtml(b.data.l4)}]`,
     likebig: b=>`\n[${stripHtml(b.data.t)}]`,
     reward: b=>`\n> ☕ ${stripHtml(b.data.t)}`,
@@ -851,6 +865,7 @@ function exportHTML(){
     tmp.innerHTML = renderBlockHTML(b);
     tmp.querySelectorAll('[contenteditable]').forEach(el=> el.removeAttribute('contenteditable'));
     tmp.querySelectorAll('[data-field]').forEach(el=> el.removeAttribute('data-field'));
+    tmp.querySelectorAll('[data-imgfield]').forEach(el=> el.removeAttribute('data-imgfield'));
     return tmp.innerHTML;
   }).join('\n');
   return `<!-- ${title} · 有一云风格 · 内联样式 -->\n${inner}`;
@@ -1210,6 +1225,20 @@ document.getElementById('fileMd').addEventListener('change', e=>{
 /* 插入图片：多选本地图转 base64，在光标处逐张插入 image 块 */
 document.getElementById('fileImg').addEventListener('change', e=>{
   const files = [...e.target.files]; if(!files.length) return;
+  // —— 更新已有块：点击画布里的图片/二维码后选图，只取第一张写入目标字段 ——
+  if(pendingImgTargetId != null){
+    const f = files[0];
+    const r = new FileReader();
+    r.onload = ()=>{
+      const b = blocks.find(x=> String(x.id) === String(pendingImgTargetId));
+      if(b){ b.data[pendingImgField] = r.result; pushHistory(); fullRender(); scheduleSnapshot(); }
+      pendingImgTargetId = null; pendingImgField = 'src';
+    };
+    r.readAsDataURL(f);
+    e.target.value='';
+    return;
+  }
+  // —— 插入模式：组件库「图片块」或「插图片」按钮触发，多张在光标处逐张插入 ——
   pushHistory();
   const bs = [];
   let pending = files.length;
@@ -1222,6 +1251,19 @@ document.getElementById('fileImg').addEventListener('change', e=>{
     r.readAsDataURL(f);
   });
   e.target.value='';
+});
+
+/* 画布点图片/二维码 → 选文件 → 更新该块图片（区分新建/更新） */
+document.getElementById('canvas').addEventListener('click', e=>{
+  const img = e.target.closest && e.target.closest('img');
+  if(!img) return;
+  const blockEl = img.closest('.block');
+  if(!blockEl) return;
+  const b = blocks.find(x=> String(x.id) === String(blockEl.dataset.id));
+  if(!b) return;
+  pendingImgTargetId = b.id;
+  pendingImgField = img.dataset.imgfield || (b.type === 'subscribe' ? 'qr' : 'src');
+  document.getElementById('fileImg').click();
 });
 
 /* 快捷键：Ctrl/Cmd + Z 撤销，Ctrl/Cmd + Y 或 Shift+Z 重做 */

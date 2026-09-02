@@ -578,6 +578,14 @@ const COMP = {
     html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;"><img src="${src}" style="display:block;width:100%;border-radius:16px;max-height:420px;object-fit:cover;">${d.cap?`<span data-field="cap" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};text-align:center;margin-top:6px;">${d.cap}</span>`:''}</section>`; } },
   img_cap:{ g:'媒体', ico:'🏞', label:'图注卡', def:{cap:'图片说明一句话', src:''},
     html:d=>{ const ph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='160'><rect width='100%' height='100%' fill='%23EAF4F1'/><text x='50%' y='50%' font-size='14' fill='%231E7B6B' text-anchor='middle' dominant-baseline='middle'>点击「插图片」或导入 MD 添加</text></svg>"; const src=d.src||ph; return `<section style="margin:16px 0;background:{{bg}};border-radius:12px;overflow:hidden;"><img src="${src}" style="display:block;width:100%;max-height:300px;object-fit:cover;">${d.cap?`<p data-field="cap" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.6;padding:10px 14px;margin:0;">${d.cap}</p>`:''}</section>`; } }
+,
+  table:{ g:'表格', ico:'▦', label:'表格', def:{headers:['项目','说明','示例'], rows:[['核心概念','一句话讲清是什么','分形'],['应用场景','能解决什么问题','海岸线长度'],['关键数据','支撑结论的数字','维数 1.26']], align:['left','left','left']},
+    html:d=>{
+      const hdr=(d.headers||[]).map((h,i)=>`<th style="padding:9px 12px;border:1px solid {{border}};background:{{tag_bg}};color:{{text}};font-weight:700;text-align:${(d.align&&d.align[i])||'left'};font-size:{{fs}};">${h}</th>`).join('');
+      const body=(d.rows||[]).map((row,r)=>`<tr>${row.map((c,i)=>`<td data-field="cell" data-r="${r}" data-c="${i}" contenteditable="true" style="padding:9px 12px;border:1px solid {{border}};text-align:${(d.align&&d.align[i])||'left'};font-size:{{fs}};vertical-align:top;">${c||''}</td>`).join('')}</tr>`).join('');
+      const thead = hdr ? `<tr>${hdr}</tr>` : '';
+      return `<table style="width:100%;border-collapse:collapse;margin:16px 0;color:{{text}};"><thead>${thead}</thead><tbody>${body}</tbody></table>`;
+    } }
 };
 
 /* ============ 数据 & 渲染 ============ */
@@ -651,7 +659,14 @@ document.getElementById('canvas').addEventListener('input', e=>{
   if(!f) return;
   const blockEl = e.target.closest('.block');
   const b = blocks.find(x=> x.id == blockEl.dataset.id);
-  if(b) b.data[f.dataset.field] = f.innerHTML;
+  if(b){
+    if(b.type==='table' && f.dataset.r!==undefined){
+      const r=+f.dataset.r, c=+f.dataset.c;
+      if(b.data.rows[r]) b.data.rows[r][c] = f.innerHTML;
+    } else {
+      b.data[f.dataset.field] = f.innerHTML;
+    }
+  }
   updateCode();
   scheduleSnapshot();
 });
@@ -701,6 +716,21 @@ function parseMdToBlocks(text){
   for(let i=0;i<lines.length;i++){
     const ln = lines[i];
     if(/^\s*$/.test(ln)){ flushP(); flushQ(); flushL(); continue; }
+    /* Markdown 表格：| 表头 | ... | 下一行 | --- | --- | */
+    if(/^\s*\|(.+)\|\s*$/.test(ln)){
+      const sep = lines[i+1];
+      if(sep && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(sep)){
+        flushP(); flushQ(); flushL();
+        const splitRow = s => s.replace(/^\s*\|/,'').replace(/\|\s*$/,'').split('|').map(x=>x.trim());
+        const headers = splitRow(ln).map(h=> inlineMd(h));
+        const align = splitRow(sep).map(x=>{ const t=x.trim(); if(t.startsWith(':')&&t.endsWith(':')) return 'center'; if(t.endsWith(':')) return 'right'; if(t.startsWith(':')) return 'left'; return 'left'; });
+        const rows = [];
+        let j = i+2;
+        while(j<lines.length && /^\s*\|(.+)\|\s*$/.test(lines[j])){ rows.push(splitRow(lines[j]).map(c=> inlineMd(c))); j++; }
+        out.push({type:'table', data:{headers, rows, align}});
+        i = j-1; continue;
+      }
+    }
     const mImg = ln.match(/^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$/);
     if(mImg){ flushP(); flushQ(); flushL(); out.push({type:'image', data:{cap: mImg[1]||'', src: mImg[2]}}); continue; }
     const mH = ln.match(/^(#{1,6})\s+(.*)$/);
@@ -800,7 +830,15 @@ function exportMd(){
     author_card: b=>`> 👤 ${stripHtml(b.data.n)}：${stripHtml(b.data.r)}（${stripHtml(b.data.s)}）`,
     img_full: b=>`![${stripHtml(b.data.cap)}](${b.data.src||''})`,
     img_round: b=>`![${stripHtml(b.data.cap)}](${b.data.src||''})`,
-    img_cap: b=>`![${stripHtml(b.data.cap)}](${b.data.src||''})`
+    img_cap: b=>`![${stripHtml(b.data.cap)}](${b.data.src||''})`,
+    table: b=>{
+      const h=(b.data.headers||[]), rows=(b.data.rows||[]), al=(b.data.align||[]);
+      const row=arr=> '| '+arr.map(x=> stripHtml(x||'').replace(/\n/g,' ')).join(' | ')+' |';
+      const sep=h.map((_,i)=>{ const a=al[i]||'left'; return a==='center'?':---:': a==='right'?'---:':'---'; }).join(' | ');
+      let s=row(h)+'\n| '+sep+' |';
+      rows.forEach(r=> s+='\n'+row(r));
+      return s;
+    }
   };
   return blocks.map(b=>{ const fn=map[b.type]; return fn?fn(b):''; }).filter(Boolean).join('\n\n');
 }

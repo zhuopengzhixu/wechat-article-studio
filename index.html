@@ -20,6 +20,8 @@
   .btn-primary:hover { background: #155c50; }
   .btn-smart { background: #C07A2B; color: #fff; }
   .btn-smart:hover { background: #a9651f; }
+  .btn-cloud { background: #07c160; color: #fff; }
+  .btn-cloud:hover { background: #06ad56; }
   .btn-ghost { background: #eef1f3; color: #444; }
   .btn-ghost:hover { background: #e2e6ea; }
   .spacer { flex: 1; }
@@ -43,9 +45,9 @@
   .block { position: relative; }
   .block img { cursor: pointer; }
   .block img:hover { outline: 2px dashed rgba(30,123,107,.7); outline-offset: 2px; }
-  .block-tools { position: absolute; right: 2px; top: 2px; display: none; gap: 4px; z-index: 5; }
+  .block-tools { position: absolute; right: 2px; top: 2px; display: none; gap: 3px; z-index: 5; }
   .block:hover .block-tools { display: flex; }
-  .block-tools button { width: 24px; height: 24px; border: none; border-radius: 5px; background: rgba(30,123,107,.92); color: #fff; font-size: 12px; cursor: pointer; line-height: 1; }
+  .block-tools button { width: 22px; height: 22px; border: none; border-radius: 5px; background: rgba(30,123,107,.92); color: #fff; font-size: 11px; cursor: pointer; line-height: 1; padding: 0; }
   .block-tools button.del { background: rgba(217,83,79,.92); }
   .block-tools button:hover { filter: brightness(1.1); }
   .block [contenteditable="true"] { outline: none; }
@@ -97,6 +99,17 @@
   .sel-swatches .sw { width:22px; height:22px; border-radius:5px; cursor:pointer; border:1px solid rgba(255,255,255,.28); }
   .sel-palette .cust { display:flex; align-items:center; gap:8px; color:#fff; font-size:12px; margin-top:8px; }
   .sel-palette .cust input { width:38px; height:26px; border:none; background:none; padding:0; cursor:pointer; }
+  /* 支付弹窗（聚合支付：导出 / 一键复制 3 分/次） */
+  #payMask .modal { width:340px; text-align:center; }
+  #payMask .amount { font-size:26px; font-weight:700; color:#1E7B6B; margin:6px 0 14px; }
+  #payMask .qr { width:200px; height:200px; object-fit:contain; border:1px solid #e3e7ea; border-radius:8px; }
+  #payMask .hint { color:#999; font-size:13px; margin:10px 0; }
+  #payMask .status { font-size:14px; margin-top:8px; }
+  #payMask .status.ok { color:#07a34a; }
+  #payMask .status.wait { color:#999; }
+  #payMask a.payurl { display:inline-block; margin-top:8px; color:#1E7B6B; font-size:13px; word-break:break-all; }
+  #payMask .close { margin-top:14px; padding:10px 18px; }
+  #payMask .err { color:#e54d42; font-size:13px; margin-top:8px; min-height:16px; }
 </style>
 </head>
 <body>
@@ -120,7 +133,8 @@
   <button class="btn btn-ghost" id="btnRedo" title="重做 (Ctrl+Y)">↷ 重做</button>
   <button class="btn btn-ghost" id="btnExportMd" title="把当前排版导出为 .md">📤 导出MD</button>
   <button class="btn btn-ghost" id="btnPreview">👁 预览</button>
-  <button class="btn btn-ghost" id="btnCopy">📋 复制代码</button>
+  <button class="btn btn-primary" id="btnCopy">📋 一键复制</button>
+  <button class="btn btn-cloud" id="btnSyncMp" title="需把本编辑器部署到云开发静态网站(https)后使用">☁ 同步到公众号</button>
   <button class="btn btn-smart" id="btnSmart">✨ 智能排版</button>
   <button class="btn btn-ghost" id="btnClear">🗑 清空</button>
   <button class="btn btn-primary" id="btnExport">⬇ 导出 HTML</button>
@@ -136,7 +150,7 @@
   <!-- 中：画布 -->
   <div class="canvas-wrap">
     <div class="phone" id="canvas">
-      <div class="phone-empty">从左侧点选组件开始编辑 👈<br>每块文字可直接点击修改<br>鼠标悬停块可 上移 / 下移 / 删除</div>
+      <div class="phone-empty">从左侧点选组件开始编辑 👈<br>每块文字可直接点击修改<br>鼠标悬停块可 ⏫最顶 / ↑上移 / ↓下移 / ⏬最底 / ✕删除</div>
     </div>
   </div>
 
@@ -193,6 +207,20 @@
   </div>
 </div>
 
+<!-- 聚合支付弹窗（导出 / 一键复制 3 分/次） -->
+<div class="modal-mask" id="payMask">
+  <div class="modal">
+    <h3 id="payTitle">支付后继续使用</h3>
+    <div class="amount" id="payAmount">¥0.03</div>
+    <img class="qr" id="payQr" alt="付款二维码" style="display:none;" />
+    <div class="hint">请用微信/支付宝扫码支付</div>
+    <a class="payurl" id="payUrl" target="_blank" rel="noopener" style="display:none;"></a>
+    <div class="status wait" id="payStatus">等待支付…</div>
+    <div class="err" id="payErr"></div>
+    <button class="close" id="payClose">取消</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- 选区格式工具条：在画布选中文字后浮出 -->
@@ -233,15 +261,15 @@ function phSvg(text, w, h){
 const COMP = {
   /* —— 框架 —— */
   header: { g:'框架', ico:'📰', label:'头部导读卡', def:{k:'高效学习法 · 第 1 篇', t:'标题：一句话讲清这篇能帮你解决什么'},
-    html:d=>`<section style="margin:0 0 20px 0;padding:16px;background:{{primary_grad}};border-radius:10px;">
+    html:d=>`<section style="margin:0 0 20px 0;padding:16px;background:{{primary}};border-radius:10px;">
   <span data-field="k" contenteditable="true" style="font-size:12px;color:rgba(255,255,255,.85);">${d.k}</span>
   <span data-field="t" contenteditable="true" style="display:block;font-size:19px;font-weight:bold;color:#FFFFFF;line-height:1.4;margin-top:6px;">${d.t}</span></section>` },
   banner: { g:'框架', ico:'🖼', label:'头图 Banner', def:{k:'高效学习法', t:'把知识讲明白，比刷题管用'},
-    html:d=>`<section style="margin:0 0 20px 0;padding:30px 18px;background:{{primary_grad}};border-radius:12px;text-align:center;">
+    html:d=>`<section style="margin:0 0 20px 0;padding:30px 18px;background:{{primary}};border-radius:12px;text-align:center;">
   <span data-field="k" contenteditable="true" style="display:block;font-size:12px;color:rgba(255,255,255,.85);letter-spacing:2px;">${d.k}</span>
   <span data-field="t" contenteditable="true" style="display:block;font-size:22px;font-weight:bold;color:#FFFFFF;line-height:1.4;margin-top:8px;">${d.t}</span></section>` },
   header_cover:{ g:'框架', ico:'🎴', label:'封面头图', def:{k:'分形之美', t:'科赫雪花：周长无限，面积有限', meta:'小芃 · 2026-09-02 · 约 5 分钟'},
-    html:d=>`<section style="margin:0 0 20px 0;padding:38px 22px;background:{{primary_grad}};border-radius:14px;text-align:center;">
+    html:d=>`<section style="margin:0 0 20px 0;padding:38px 22px;background:{{primary}};border-radius:14px;text-align:center;">
   <span data-field="k" contenteditable="true" style="display:block;font-size:12px;color:rgba(255,255,255,.85);letter-spacing:3px;">${d.k}</span>
   <span data-field="t" contenteditable="true" style="display:block;font-size:24px;font-weight:bold;color:#FFFFFF;line-height:1.35;margin:10px 0 12px;">${d.t}</span>
   <span style="display:inline-block;width:40px;height:3px;background:rgba(255,255,255,.7);border-radius:2px;"></span>
@@ -284,7 +312,7 @@ const COMP = {
   <span data-field="h" contenteditable="true" style="display:block;font-size:14px;font-weight:bold;color:{{primary}};margin-bottom:10px;">${d.h}</span>
   <p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.9;margin:0;">${d.i}</p></section>` },
   subscribe:{ g:'框架', ico:'➕', label:'关注引导卡', def:{n:'公众号名字', s:'一句价值主张，为什么值得关注。', qr:''},
-    html:d=>{ const qrph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='100%' height='100%' fill='%23fff'/><text x='50%' y='50%' font-size='11' fill='%23999' text-anchor='middle' dominant-baseline='middle'>二维码</text></svg>"; return `<section style="margin:22px 0;padding:18px;background:{{primary_grad}};border-radius:12px;display:flex;align-items:center;">
+    html:d=>{ const qrph="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='100%' height='100%' fill='%23fff'/><text x='50%' y='50%' font-size='11' fill='%23999' text-anchor='middle' dominant-baseline='middle'>二维码</text></svg>"; return `<section style="margin:22px 0;padding:18px;background:{{primary}};border-radius:12px;display:flex;align-items:center;">
   <div style="flex:1;">
     <span data-field="n" contenteditable="true" style="display:block;font-size:16px;font-weight:bold;color:#FFFFFF;">${d.n}</span>
     <span data-field="s" contenteditable="true" style="display:block;font-size:13px;color:rgba(255,255,255,.9);margin-top:4px;line-height:1.5;">${d.s}</span>
@@ -322,7 +350,7 @@ const COMP = {
   <span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{primary}};vertical-align:middle;">${d.t}</span></section>` },
   hbadge:{ g:'标题', ico:'①', label:'序号徽章标题', def:{n:'1', t:'序号标题'},
     html:d=>`<section style="margin:24px 0 12px 0;line-height:1.4;">
-  <span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;background:{{primary_grad}};color:#FFFFFF;border-radius:50%;font-size:13px;font-weight:bold;margin-right:8px;vertical-align:middle;">${d.n}</span>
+  <span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;background:{{primary}};color:#FFFFFF;border-radius:50%;font-size:13px;font-weight:bold;margin-right:8px;vertical-align:middle;">${d.n}</span>
   <span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{primary}};vertical-align:middle;">${d.t}</span></section>` },
   h2: { g:'标题', ico:'▪', label:'二级小标题', def:{t:'二级小标题'},
     html:d=>`<section style="margin:20px 0 10px 0;"><span data-field="t" contenteditable="true" style="font-size:16px;font-weight:bold;color:{{primary}};line-height:1.5;">${d.t}</span></section>` },
@@ -334,15 +362,15 @@ const COMP = {
   h_underline:{ g:'标题', ico:'▁', label:'下划线标题', def:{t:'小标题'},
     html:d=>`<section style="margin:22px 0 12px 0;padding-bottom:8px;border-bottom:2px solid {{primary}};"><span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{text}};">${d.t}</span></section>` },
   h_fill:{ g:'标题', ico:'▰', label:'实心底块标题', def:{t:'小标题'},
-    html:d=>`<section style="margin:22px 0 12px 0;"><span data-field="t" contenteditable="true" style="display:inline-block;font-size:16px;font-weight:bold;color:#FFFFFF;background:{{primary_grad}};padding:6px 14px;border-radius:6px;">${d.t}</span></section>` },
+    html:d=>`<section style="margin:22px 0 12px 0;"><span data-field="t" contenteditable="true" style="display:inline-block;font-size:16px;font-weight:bold;color:#FFFFFF;background:{{primary}};padding:6px 14px;border-radius:6px;">${d.t}</span></section>` },
   h_tag:{ g:'标题', ico:'◧', label:'强调线标题', def:{t:'小标题'},
     html:d=>`<section style="margin:22px 0 12px 0;"><span style="display:inline-block;width:4px;height:18px;background:{{accent}};border-radius:2px;margin-right:8px;vertical-align:middle;"></span><span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{primary}};vertical-align:middle;">${d.t}</span></section>` },
   h_dot:{ g:'标题', ico:'◉', label:'圆点标题', def:{t:'小标题'},
     html:d=>`<section style="margin:22px 0 12px 0;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:{{accent}};margin-right:8px;vertical-align:middle;"></span><span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{text}};vertical-align:middle;">${d.t}</span></section>` },
   h_number:{ g:'标题', ico:'#', label:'数字前缀标题', def:{n:'01', t:'小标题'},
     html:d=>`<section style="margin:22px 0 12px 0;line-height:1.4;"><span style="font-size:22px;font-weight:bold;color:{{primary}};opacity:.35;margin-right:8px;vertical-align:middle;">${d.n}</span><span data-field="t" contenteditable="true" style="font-size:18px;font-weight:bold;color:{{text}};vertical-align:middle;">${d.t}</span></section>` },
-  h_gradient:{ g:'标题', ico:'🌈', label:'渐变文字标题', def:{t:'小标题'},
-    html:d=>`<section style="margin:22px 0 12px 0;"><span data-field="t" contenteditable="true" style="font-size:20px;font-weight:bold;background:{{primary_grad}};-webkit-background-clip:text;background-clip:text;color:transparent;">${d.t}</span></section>` },
+  h_gradient:{ g:'标题', ico:'🌈', label:'主色文字标题', def:{t:'小标题'},
+    html:d=>`<section style="margin:22px 0 12px 0;"><span data-field="t" contenteditable="true" style="font-size:20px;font-weight:bold;color:{{primary}};">${d.t}</span></section>` },
   /* —— 正文 —— */
   p: { g:'正文', ico:'¶', label:'正文段落', def:{t:'正文内容。把复杂的东西讲简单，才是真的懂了。'},
     html:d=>`<section style="margin:0 0 16px 0;"><span data-field="t" contenteditable="true" style="font-size:{{fs}}px;color:{{text}};line-height:1.75;">${d.t}</span></section>` },
@@ -369,7 +397,7 @@ const COMP = {
   quote_center:{ g:'正文', ico:'❢', label:'居中引言', def:{t:'一句值得反复读的话。', s:'—— 出处'},
     html:d=>`<section style="margin:18px 0;text-align:center;"><span data-field="t" contenteditable="true" style="font-size:17px;color:{{primary}};line-height:1.8;font-weight:bold;font-style:italic;">${d.t}</span><span data-field="s" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:6px;">${d.s}</span></section>` },
   quote_mark:{ g:'正文', ico:'🗨', label:'大标记引用', def:{t:'好文章不是写给人看的，是写给人想通的。'},
-    html:d=>`<section style="margin:18px 0;padding:18px 20px;background:{{primary_grad}};border-radius:10px;">
+    html:d=>`<section style="margin:18px 0;padding:18px 20px;background:{{primary}};border-radius:10px;">
   <span style="font-size:30px;color:rgba(255,255,255,.7);font-family:Georgia,serif;line-height:1;">“</span>
   <span data-field="t" contenteditable="true" style="display:block;font-size:15px;color:#FFFFFF;line-height:1.8;margin-top:-12px;font-style:italic;">${d.t}</span></section>` },
   quote_color:{ g:'正文', ico:'🎨', label:'彩底引用', def:{t:'这是一段需要强调的引用，彩底更吸睛。', s:'—— 出处'},
@@ -397,10 +425,10 @@ const COMP = {
   <p data-field="r" contenteditable="true" style="font-size:13px;color:{{text}};line-height:1.6;margin:6px 0 0;">${d.r}</p>
 </td></tr></table>` },
   steps: { g:'重点块', ico:'🧭', label:'步骤流程卡', def:{s1:'写下概念', d1:'拿出一张白纸，把要学的概念写下来。', s2:'讲给 8 岁小孩', d2:'用最白的大白话，假装对方完全不懂。'},
-    html:d=>`<section style="margin:14px 0;"><span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;background:{{primary_grad}};color:#FFFFFF;border-radius:50%;font-size:13px;font-weight:bold;margin-right:8px;vertical-align:middle;">1</span>
+    html:d=>`<section style="margin:14px 0;"><span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;background:{{primary}};color:#FFFFFF;border-radius:50%;font-size:13px;font-weight:bold;margin-right:8px;vertical-align:middle;">1</span>
   <span data-field="s1" contenteditable="true" style="font-size:15px;color:{{text}};font-weight:bold;vertical-align:middle;">${d.s1}</span>
   <p data-field="d1" contenteditable="true" style="margin:6px 0 0 30px;font-size:14px;color:{{text}};line-height:1.6;">${d.d1}</p></section>
-<section style="margin:14px 0;"><span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;background:{{primary_grad}};color:#FFFFFF;border-radius:50%;font-size:13px;font-weight:bold;margin-right:8px;vertical-align:middle;">2</span>
+<section style="margin:14px 0;"><span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;background:{{primary}};color:#FFFFFF;border-radius:50%;font-size:13px;font-weight:bold;margin-right:8px;vertical-align:middle;">2</span>
   <span data-field="s2" contenteditable="true" style="font-size:15px;color:{{text}};font-weight:bold;vertical-align:middle;">${d.s2}</span>
   <p data-field="d2" contenteditable="true" style="margin:6px 0 0 30px;font-size:14px;color:{{text}};line-height:1.6;">${d.d2}</p></section>` },
   icons: { g:'重点块', ico:'🔳', label:'要点图标卡', def:{e1:'📌', t1:'先讲简单的', c1:'建立信心，别一上来就啃难题。', e2:'💡', t2:'真问为什么', c2:'你当学生要装傻，别敷衍。'},
@@ -417,12 +445,12 @@ const COMP = {
   timeline:{ g:'重点块', ico:'🕒', label:'时间轴', def:{t1:'阶段一 · 入门', c1:'先建立基础认知，不追求深度。', t2:'阶段二 · 进阶', c2:'开始做项目，在错误里迭代。'},
     html:d=>`<section style="margin:16px 0;padding:0 0 0 14px;border-left:2px solid {{border}};">
   <section style="position:relative;margin:0 0 14px 0;">
-    <span style="position:absolute;left:-22px;top:3px;width:10px;height:10px;border-radius:50%;background:{{primary_grad}};"></span>
+    <span style="position:absolute;left:-22px;top:3px;width:10px;height:10px;border-radius:50%;background:{{primary}};"></span>
     <span data-field="t1" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};">${d.t1}</span>
     <p data-field="c1" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.6;margin:4px 0 0;">${d.c1}</p>
   </section>
   <section style="position:relative;margin:0 0 14px 0;">
-    <span style="position:absolute;left:-22px;top:3px;width:10px;height:10px;border-radius:50%;background:{{primary_grad}};"></span>
+    <span style="position:absolute;left:-22px;top:3px;width:10px;height:10px;border-radius:50%;background:{{primary}};"></span>
     <span data-field="t2" contenteditable="true" style="font-size:15px;font-weight:bold;color:{{primary}};">${d.t2}</span>
     <p data-field="c2" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.6;margin:4px 0 0;">${d.c2}</p>
   </section></section>` },
@@ -453,13 +481,13 @@ const COMP = {
   qa: { g:'重点块', ico:'💬', label:'问答气泡', def:{q:'为什么看懂了还是不会做？', a:'看懂是被动输入，讲出来才是主动输出，差一个"用自己的话复述"。'},
     html:d=>`<section style="margin:14px 0;">
   <p style="margin:0 0 8px 0;font-size:14px;color:{{text}};"><span style="display:inline-block;background:{{tag_bg}};color:{{primary_dark}};font-weight:bold;padding:2px 8px;border-radius:6px;margin-right:6px;">Q</span><span data-field="q" contenteditable="true">${d.q}</span></p>
-  <p style="margin:0;font-size:14px;color:{{text}};"><span style="display:inline-block;background:{{primary_grad}};color:#FFFFFF;font-weight:bold;padding:2px 8px;border-radius:6px;margin-right:6px;">A</span><span data-field="a" contenteditable="true">${d.a}</span></p></section>` },
+  <p style="margin:0;font-size:14px;color:{{text}};"><span style="display:inline-block;background:{{primary}};color:#FFFFFF;font-weight:bold;padding:2px 8px;border-radius:6px;margin-right:6px;">A</span><span data-field="a" contenteditable="true">${d.a}</span></p></section>` },
   side: { g:'重点块', ico:'➡', label:'侧标重点', def:{t:'这一段是整篇的核心：先把概念讲给 8 岁小孩听，讲不通的地方就是你没真懂的地方。'},
     html:d=>`<section style="margin:14px 0;padding:12px 14px;background:{{bg}};border-right:4px solid {{accent}};border-radius:6px;">
   <span data-field="t" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.7;">${d.t}</span></section>` },
-  code: { g:'重点块', ico:'</>', label:'代码块', def:{t:'var a = 1;<br>var b = 2;<br>console.log(a + b);'},
-    html:d=>`<section style="margin:14px 0;padding:12px 14px;background:#2B2B2B;border-radius:8px;">
-  <span data-field="t" contenteditable="true" style="display:block;font-family:Consolas,Menlo,monospace;font-size:13px;color:#E6E6E6;line-height:1.7;white-space:pre;">${d.t}</span></section>` },
+  code: { g:'重点块', ico:'</>', label:'代码块', def:{t:'var a = 1;\nvar b = 2;\nconsole.log(a + b);'},
+    html:d=>`<section style="margin:14px 0;padding:12px 14px;background:#2B2B2B;color:#E6E6E6;border-radius:8px;">
+  <div data-field="t" contenteditable="true" style="font-family:Consolas,Menlo,monospace;font-size:13px;color:#E6E6E6;line-height:1.7;">${d.t.split('\n').map(l=> l.trim()==='' ? '<div style="margin:0;color:#E6E6E6;font-family:Consolas,Menlo,monospace;">&nbsp;</div>' : '<div style="margin:0;color:#E6E6E6;font-family:Consolas,Menlo,monospace;">'+l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/ /g,'&nbsp;')+'</div>').join('')}</div></section>` },
   imgtext:{ g:'重点块', ico:'🖼', label:'图文卡', def:{img:'', t:'案例标题', c:'一句话讲清这个案例说明什么，给读者启发。'},
     html:d=>`<table style="width:100%;border-collapse:separate;border-spacing:0;margin:16px 0;table-layout:fixed;">
 <tr><td style="width:34%;padding:0;vertical-align:middle;">
@@ -488,7 +516,7 @@ const COMP = {
   <span data-field="n2" contenteditable="true" style="display:block;font-size:24px;font-weight:bold;color:{{accent}};">${d.n2}</span>
   <span data-field="s2" contenteditable="true" style="display:block;font-size:12px;color:{{text_sub}};margin-top:2px;">${d.s2}</span></td></tr></table>` },
   stat_big:{ g:'重点块', ico:'🔟', label:'巨数字', def:{n:'1.26', s:'科赫曲线的分形维数，介于线与面之间'},
-    html:d=>`<section style="margin:16px 0;padding:24px;text-align:center;background:{{primary_grad}};border-radius:12px;">
+    html:d=>`<section style="margin:16px 0;padding:24px;text-align:center;background:{{primary}};border-radius:12px;">
   <span data-field="n" contenteditable="true" style="display:block;font-size:42px;font-weight:bold;color:#FFFFFF;line-height:1;">${d.n}</span>
   <span data-field="s" contenteditable="true" style="display:block;font-size:13px;color:rgba(255,255,255,.9);margin-top:8px;">${d.s}</span></section>` },
   stat_compare:{ g:'重点块', ico:'📈', label:'对比数字', def:{n1:'10%', n2:'90%', s:'从被动阅读到主动讲授的留存率跃升'},
@@ -503,10 +531,10 @@ const COMP = {
     html:d=>`<section style="margin:14px 0;"><p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.9;margin:0;">${d.i}</p></section>` },
   list_circle:{ g:'重点块', ico:'⚫', label:'圆点列表', def:{i:'<span style="color:{{accent}};">●</span> 第一点<br><span style="color:{{accent}};">●</span> 第二点<br><span style="color:{{accent}};">●</span> 第三点'},
     html:d=>`<section style="margin:14px 0;"><p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.9;margin:0;">${d.i}</p></section>` },
-  list_step:{ g:'重点块', ico:'🔢', label:'步骤列表', def:{i:'<span style="display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;background:{{primary_grad}};color:#fff;border-radius:50%;font-size:12px;font-weight:bold;margin-right:6px;">1</span>第一步<br><span style="display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;background:{{primary_grad}};color:#fff;border-radius:50%;font-size:12px;font-weight:bold;margin-right:6px;">2</span>第二步'},
+  list_step:{ g:'重点块', ico:'🔢', label:'步骤列表', def:{i:'<span style="display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;background:{{primary}};color:#fff;border-radius:50%;font-size:12px;font-weight:bold;margin-right:6px;">1</span>第一步<br><span style="display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;background:{{primary}};color:#fff;border-radius:50%;font-size:12px;font-weight:bold;margin-right:6px;">2</span>第二步'},
     html:d=>`<section style="margin:14px 0;"><p data-field="i" contenteditable="true" style="font-size:14px;color:{{text}};line-height:2;margin:0;">${d.i}</p></section>` },
   tips_solid:{ g:'重点块', ico:'💠', label:'实心提示框', def:{l:'提示', t:'这是补充信息，帮助理解上下文。'},
-    html:d=>`<section style="margin:14px 0;padding:12px 14px;background:{{primary_grad}};border-radius:6px;">
+    html:d=>`<section style="margin:14px 0;padding:12px 14px;background:{{primary}};border-radius:6px;">
   <span data-field="l" contenteditable="true" style="font-size:13px;font-weight:bold;color:#FFFFFF;">💡 ${d.l}</span>
   <p data-field="t" contenteditable="true" style="font-size:13px;color:rgba(255,255,255,.95);line-height:1.6;margin:4px 0 0;">${d.t}</p></section>` },
   note:{ g:'重点块', ico:'📝', label:'便签', def:{t:'便签：随手记一句提醒，用暖色底更显眼。'},
@@ -539,7 +567,7 @@ const COMP = {
     html:d=>`<section style="margin:20px 0;border-top:1px solid {{border}};"></section>` },
   cta: { g:'互动', ico:'👉', label:'结尾按钮', def:{t:'点个「在看」鼓励一下 →'},
     html:d=>`<section style="margin:22px 0;text-align:center;">
-  <span data-field="t" contenteditable="true" style="display:inline-block;padding:11px 30px;background:{{primary_grad}};color:#FFFFFF;border-radius:24px;font-size:15px;font-weight:bold;">${d.t}</span></section>` },
+  <span data-field="t" contenteditable="true" style="display:inline-block;padding:11px 30px;background:{{primary}};color:#FFFFFF;border-radius:24px;font-size:15px;font-weight:bold;">${d.t}</span></section>` },
   likebar:{ g:'互动', ico:'👍', label:'点赞互动条', def:{l1:'👍 点赞', l2:'⭐ 在看', l3:'🔖 收藏', l4:'↗ 分享'},
     html:d=>`<section style="margin:22px 0;text-align:center;">
   <span style="display:inline-block;padding:9px 4px;background:{{tag_bg}};border-radius:24px;font-size:14px;white-space:nowrap;">
@@ -568,12 +596,12 @@ const COMP = {
   <p data-field="a" contenteditable="true" style="font-size:14px;color:{{text}};line-height:1.7;margin:0;">${d.a}</p></section>` },
   share_round:{ g:'互动', ico:'↗', label:'圆形分享', def:{t:'分享给朋友'},
     html:d=>`<section style="margin:20px 0;text-align:center;">
-  <span data-field="t" contenteditable="true" style="display:inline-block;width:54px;height:54px;line-height:54px;text-align:center;background:{{primary_grad}};color:#FFFFFF;border-radius:50%;font-size:20px;">↗</span>
+  <span data-field="t" contenteditable="true" style="display:inline-block;width:54px;height:54px;line-height:54px;text-align:center;background:{{primary}};color:#FFFFFF;border-radius:50%;font-size:20px;">↗</span>
   <span style="display:block;font-size:13px;color:{{text_sub}};margin-top:8px;">${d.t}</span></section>` },
   progress:{ g:'互动', ico:'📊', label:'进度条', def:{t:'读完进度', p:'70%'},
     html:d=>`<section style="margin:16px 0;">
   <span data-field="t" contenteditable="true" style="display:block;font-size:13px;color:{{text_sub}};margin-bottom:6px;">${d.t}</span>
-  <span style="display:block;height:8px;background:{{border}};border-radius:4px;overflow:hidden;"><span style="display:block;height:8px;width:${d.p};background:{{primary_grad}};border-radius:4px;"></span></span></section>` },
+  <span style="display:block;height:8px;background:{{border}};border-radius:4px;overflow:hidden;"><span style="display:block;height:8px;width:${d.p};background:{{primary}};border-radius:4px;"></span></span></section>` },
   declare:{ g:'互动', ico:'ⓘ', label:'合规声明', def:{t:'本文为个人经验整理，仅供参考。内容如有不严谨之处，欢迎评论区指正。'},
     html:d=>`<section style="margin:16px 0 0 0;padding-top:12px;border-top:1px solid {{border}};">
   <span data-field="t" contenteditable="true" style="font-size:12px;color:{{text_sub}};line-height:1.6;">${d.t}</span></section>` },
@@ -624,7 +652,7 @@ function buildBlockNode(b){
   node.dataset.type = b.type;
   const tools = document.createElement('div');
   tools.className = 'block-tools';
-  tools.innerHTML = `<button class="up" title="上移">↑</button><button class="down" title="下移">↓</button><button class="del" title="删除">✕</button>`;
+  tools.innerHTML = `<button class="top" title="移到最顶">⏫</button><button class="up" title="上移">↑</button><button class="down" title="下移">↓</button><button class="bottom" title="移到最底">⏬</button><button class="del" title="删除">✕</button>`;
   const body = document.createElement('div');
   body.className = 'block-body';
   body.innerHTML = renderBlockHTML(b);
@@ -635,7 +663,7 @@ function buildBlockNode(b){
 function fullRender(){
   const canvas = document.getElementById('canvas');
   if(blocks.length===0){
-    canvas.innerHTML = '<div class="phone-empty">从左侧点选组件开始编辑 👈<br>每块文字可直接点击修改<br>鼠标悬停块可 上移 / 下移 / 删除<br>也可「📥 导入MD」一键载入草稿</div>';
+    canvas.innerHTML = '<div class="phone-empty">从左侧点选组件开始编辑 👈<br>每块文字可直接点击修改<br>鼠标悬停块可 ⏫最顶 / ↑上移 / ↓下移 / ⏬最底 / ✕删除<br>也可「📥 导入MD」一键载入草稿</div>';
   } else {
     canvas.innerHTML = '';
     blocks.forEach(b=> canvas.appendChild(buildBlockNode(b)));
@@ -676,6 +704,8 @@ document.getElementById('canvas').addEventListener('input', e=>{
     if(b.type==='table' && f.dataset.r!==undefined){
       const r=+f.dataset.r, c=+f.dataset.c;
       if(b.data.rows[r]) b.data.rows[r][c] = f.innerHTML;
+    } else if(b.type==='code' && f.dataset.field==='t'){
+      b.data.t = f.textContent;   // 代码块存纯文本（保留换行），导出时再包 div+&nbsp;，避免 white-space:pre 在公众号被过滤导致连成一行
     } else {
       b.data[f.dataset.field] = f.innerHTML;
     }
@@ -684,16 +714,19 @@ document.getElementById('canvas').addEventListener('input', e=>{
   scheduleSnapshot();
 });
 
-/* 工具条：上移/下移/删除 */
+/* 工具条：上移/下移/移到最顶/移到最底/删除 */
 document.getElementById('canvas').addEventListener('click', e=>{
   const btn = e.target.closest('.block-tools button');
   if(!btn) return;
   const blockEl = e.target.closest('.block');
-  const id = blockEl.dataset.id;
-  const idx = blocks.findIndex(x=> x.id == id);
+  const id = Number(blockEl.dataset.id);            // 按数值 id 精确匹配，避免字符串/数字混淆
+  const idx = blocks.findIndex(x=> x.id === id);
+  if(idx < 0) return;
   if(btn.classList.contains('del')){ pushHistory(); blocks.splice(idx,1); blockEl.remove(); if(blocks.length===0) fullRender(); save(); updateWordCount(); }
-  else if(btn.classList.contains('up') && idx>0){ pushHistory(); [blocks[idx-1],blocks[idx]]=[blocks[idx],blocks[idx-1]]; fullRender(); }
-  else if(btn.classList.contains('down') && idx<blocks.length-1){ pushHistory(); [blocks[idx+1],blocks[idx]]=[blocks[idx],blocks[idx+1]]; fullRender(); }
+  else if(btn.classList.contains('up')){ if(idx>0){ pushHistory(); [blocks[idx-1],blocks[idx]]=[blocks[idx],blocks[idx-1]]; fullRender(); } }
+  else if(btn.classList.contains('down')){ if(idx<blocks.length-1){ pushHistory(); [blocks[idx+1],blocks[idx]]=[blocks[idx],blocks[idx+1]]; fullRender(); } }
+  else if(btn.classList.contains('top')){ if(idx>0){ pushHistory(); const [b]=blocks.splice(idx,1); blocks.unshift(b); fullRender(); } }   // 移到最顶
+  else if(btn.classList.contains('bottom')){ if(idx<blocks.length-1){ pushHistory(); const [b]=blocks.splice(idx,1); blocks.push(b); fullRender(); } } // 移到最底
   updateCode();
 });
 
@@ -709,7 +742,7 @@ function redo(){ if(!redoStack.length) return; history.push(JSON.stringify(block
 /* ============ 自动保存 / 恢复（localStorage）============ */
 const LS_KEY = 'wechat-editor-v1';
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({ blocks, curTheme, title: document.getElementById('docTitle').value, fs: document.getElementById('fontSize').value })); }catch(e){} }
-function load(){ try{ const s = localStorage.getItem(LS_KEY); if(!s) return false; const o = JSON.parse(s); if(o.blocks && o.blocks.length){ blocks = o.blocks; curTheme = o.curTheme || 'moqing'; if(o.title) document.getElementById('docTitle').value = o.title; if(o.fs) document.getElementById('fontSize').value = o.fs; return true; } }catch(e){} return false; }
+function load(){ try{ const s = localStorage.getItem(LS_KEY); if(!s) return false; const o = JSON.parse(s); if(o.blocks && o.blocks.length){ blocks = o.blocks; curTheme = o.curTheme || 'moqing'; if(o.title) document.getElementById('docTitle').value = o.title; if(o.fs) document.getElementById('fontSize').value = o.fs; /* 关键：把 uid 进位到已恢复块的最大 id 之后，避免新块 id 与已加载块撞车导致移动/删除错位 */ uid = Math.max(uid, 0, ...blocks.map(b=> +b.id||0)) + 1; return true; } }catch(e){} return false; }
 
 /* ============ 实时字数 ============ */
 function updateWordCount(){ const tmp = document.createElement('div'); tmp.innerHTML = exportHTML(); const txt = (tmp.textContent||'').replace(/\s/g,''); document.getElementById('wordCount').textContent = txt.length + ' 字'; }
@@ -722,13 +755,26 @@ function inlineMd(s){ return (s||'')
   .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2">$1</a>'); }
 function parseMdToBlocks(text){
   const lines = text.split(/\r?\n/); const out = [];
-  let para = [], quote = [], list = [];
-  const flushP = ()=>{ if(para.length){ out.push({type:'p', data:{t: inlineMd(para.join('\n'))}}); para=[]; } };
+  let start = 0;
+  if(lines[0] && lines[0].trim()==='---'){
+    const k = lines.findIndex((l,idx)=> idx>0 && l.trim()==='---');
+    if(k>0) start = k+1;
+  }
+  let para = [], quote = [], list = [], listOrdered = false;
+  const flushP = ()=>{ if(para.length){ out.push({type:'p', data:{t: inlineMd(para.join('<br>'))}}); para=[]; } };
   const flushQ = ()=>{ if(quote.length){ out.push({type:'quote', data:{t: inlineMd(quote.join('<br>')), s:''}}); quote=[]; } };
-  const flushL = ()=>{ if(list.length){ out.push({type:'checklist', data:{i: list.map(x=>'· '+inlineMd(x)).join('<br>')}}); list=[]; } };
-  for(let i=0;i<lines.length;i++){
+  const flushL = ()=>{ if(list.length){ const i = listOrdered ? list.map((x,k)=> (k+1)+'. '+inlineMd(x)).join('<br>') : list.map(x=> '· '+inlineMd(x)).join('<br>'); out.push({type:'checklist', data:{i}}); list=[]; listOrdered=false; } };
+  for(let i=start;i<lines.length;i++){
     const ln = lines[i];
     if(/^\s*$/.test(ln)){ flushP(); flushQ(); flushL(); continue; }
+    /* 围栏代码块：``` 或 ```lang ... ``` */
+    if(/^\s*```/.test(ln)){
+      flushP(); flushQ(); flushL();
+      const code = []; let j = i+1;
+      while(j<lines.length && !/^\s*```\s*$/.test(lines[j])){ code.push(lines[j]); j++; }
+      out.push({type:'code', data:{t: code.join('\n')}});
+      i = j; continue;
+    }
     /* Markdown 表格：| 表头 | ... | 下一行 | --- | --- | */
     if(/^\s*\|(.+)\|\s*$/.test(ln)){
       const sep = lines[i+1];
@@ -755,8 +801,10 @@ function parseMdToBlocks(text){
     if(/^\s*(---|\*\*\*|___)\s*$/.test(ln)){ flushP(); flushQ(); flushL(); out.push({type:'divider', data:{}}); continue; }
     const mQ = ln.match(/^\s*>\s?(.*)$/);
     if(mQ){ quote.push(mQ[1]); continue; }
+    const mN = ln.match(/^\s*\d+[.)]\s+(.*)$/);
+    if(mN){ if(list.length && !listOrdered) flushL(); listOrdered=true; list.push(mN[1]); continue; }
     const mL = ln.match(/^\s*[-*+]\s+(.*)$/);
-    if(mL){ list.push(mL[1]); continue; }
+    if(mL){ if(list.length && listOrdered) flushL(); listOrdered=false; list.push(mL[1]); continue; }
     para.push(ln);
   }
   flushP(); flushQ(); flushL();
@@ -765,9 +813,9 @@ function parseMdToBlocks(text){
 
 /* ============ 导出 .md ============ */
 function stripHtml(html){ const t = document.createElement('div'); t.innerHTML = html||''; t.querySelectorAll('br').forEach(br=> br.replaceWith('\n')); return (t.textContent||'').trim(); }
-function exportMd(){
+function exportMd(src){
   const map = {
-    banner: b=>`# ${stripHtml(b.data.t)}`, header: b=>`# ${stripHtml(b.data.t)}`,
+    banner: b=>`# ${stripHtml(b.data.t)}` + (b.data.k?`\n\n> ${b.data.k}`:''), header: b=>`# ${stripHtml(b.data.t)}`,
     h1: b=>`## ${stripHtml(b.data.t)}`, h2: b=>`### ${stripHtml(b.data.t)}`,
     hbadge: b=>`## ${b.data.n}. ${stripHtml(b.data.t)}`,
     p: b=>`${stripHtml(b.data.t)}`,
@@ -775,7 +823,7 @@ function exportMd(){
     quotebig: b=>`> ${stripHtml(b.data.t)}${b.data.s?'\n> '+stripHtml(b.data.s):''}`,
     golden: b=>`> ${stripHtml(b.data.t)}`, goldencard: b=>`> ${stripHtml(b.data.t)}`, side: b=>`> ${stripHtml(b.data.t)}`,
     think: b=>`> ${stripHtml(b.data.h)} ${stripHtml(b.data.t)}`,
-    checklist: b=>`${stripHtml(b.data.i).split('\n').map(x=>'- '+x.replace(/^·\s?/,'').trim()).join('\n')}`,
+    checklist: b=>{ const lines = stripHtml(b.data.i).split('\n').map(x=>{ const t=x.trim(); if(/^·\s?/.test(t)) return '- '+t.replace(/^·\s?/,''); if(/^\d+[.)]\s?/.test(t)) return t; if(/^[✓✔✕✗]\s?/.test(t)){ const ok=(t[0]==='✓'||t[0]==='✔'); return '- ['+(ok?'x':' ')+'] '+t.replace(/^[✓✔✕✗]\s?/,''); } return '- '+t; }); return lines.join('\n'); },
     tags: b=>`\n${stripHtml(b.data.i)}`,
     cta: b=>`\n[${stripHtml(b.data.t)}]`,
     image: b=>`![${stripHtml(b.data.cap)}](${b.data.src||''})`,
@@ -854,7 +902,14 @@ function exportMd(){
       return s;
     }
   };
-  return blocks.map(b=>{ const fn=map[b.type]; return fn?fn(b):''; }).filter(Boolean).join('\n\n');
+  const bs = (src && Array.isArray(src) && src.length) ? src : blocks;
+  const body = bs.map(b=>{ const fn=map[b.type]; return fn?fn(b):''; }).filter(Boolean).join('\n\n');
+  const titleEl = document.getElementById('docTitle');
+  const title = (titleEl && titleEl.value || '').trim() || '未命名文章';
+  const d = new Date();
+  const ds = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const fm = '---\ntitle: '+title+'\ndate: '+ds+'\ntheme: '+(curTheme||'moqing')+'\ntags: []\n---\n\n';
+  return fm + body + '\n';
 }
 
 /* ============ 导出 / 复制 / 预览 ============ */
@@ -888,29 +943,191 @@ function updateCode(){
   document.getElementById('codeBox').textContent = blocks.length ? exportHTML() : '/* 添加组件后显示 */';
 }
 
+/* 跨环境复制：先试 execCommand（同步、在用户点击手势内最稳，file:// 与 https 都可用）；
+   仅当它失败再回落到原生 Clipboard API（https/localhost 安全上下文）。
+   注意：file:// 在 Chrome 下 isSecureContext 为 true，但 navigator.clipboard.writeText 会抛 NotAllowedError，
+   所以绝不能把 clipboard 当首选，否则本地打开必失败。 */
+function copyText(text){
+  /* 方案1：textarea + execCommand，必须在用户手势内同步执行 */
+  try{
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly','');
+    ta.style.position='fixed'; ta.style.left='0'; ta.style.top='-9999px'; ta.style.opacity='0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if(ok) return Promise.resolve();
+  }catch(e){ /* 落入下方 Clipboard API */ }
+  /* 方案2：原生 Clipboard API 兜底（安全上下文） */
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text);
+  }
+  return Promise.reject(new Error('复制不可用'));
+}
+
+/* 复制「所见即所得的富文本」(text/html) 到剪贴板：粘进公众号编辑器直接渲染，而不是 HTML 源码。
+   原理：用临时 contentEditable 容器装 HTML → 选中全部 → execCommand('copy')，
+   浏览器会把选区同时以 text/html 富文本写入剪贴板（富文本编辑器复制粘贴标准机制），
+   在 file:// 与 https 下都可用，且不依赖安全上下文；原生 ClipboardItem 仅作极端兜底。 */
+function copyRichText(html){
+  return new Promise((resolve, reject)=>{
+    try{
+      const div = document.createElement('div');
+      div.contentEditable = 'true';
+      div.style.position='fixed'; div.style.left='0'; div.style.top='-9999px'; div.style.opacity='0';
+      div.innerHTML = html;
+      document.body.appendChild(div);
+      const range = document.createRange();
+      range.selectNodeContents(div);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      const ok = document.execCommand('copy');
+      sel.removeAllRanges();
+      document.body.removeChild(div);
+      if(ok) return resolve();
+    }catch(e){ /* 落入下方 ClipboardItem 兜底 */ }
+    /* 极端兜底：原生 Clipboard API 写 text/html（仅 https/localhost 安全上下文） */
+    if(navigator.clipboard && window.isSecureContext && typeof ClipboardItem !== 'undefined'){
+      try{
+        const item = new ClipboardItem({
+          'text/html': new Blob([html], {type:'text/html'}),
+          'text/plain': new Blob([html], {type:'text/plain'})
+        });
+        return navigator.clipboard.write([item]).then(resolve).catch(reject);
+      }catch(e){ return reject(e); }
+    }
+    return reject(new Error('复制不可用'));
+  });
+}
+
 document.getElementById('btnCopy').onclick = ()=>{
   if(!blocks.length){ toast('还没有内容，先添加组件或用智能排版'); return; }
-  navigator.clipboard.writeText(exportHTML()).then(()=> toast('已复制纯内联 HTML ✓ 可直接粘贴进公众号')).catch(()=> toast('复制失败，请在导出浮层里手动选择代码'));
+  ensurePaid('copy', ()=>{
+    copyRichText(exportHTML())
+      .then(()=> toast('已复制 ✓ 直接 Ctrl+V 粘进公众号即可（富文本·非源码）'))
+      .catch(()=> toast('复制失败，请在「导出 HTML」浮层里手动复制代码'));
+  });
 };
-/* 触发浏览器原生"保存"对话框（最稳的 file:// 下载方式） */
-function downloadFile(filename, content, mime){
-  const mimeType = mime || 'text/html;charset=utf-8';
-  /* 方案A：原生「另存为」对话框 —— Chrome 86+/Edge 86+ 可用 */
-  if(window.showSaveFilePicker){
-    const blob = new Blob([content], {type: mimeType});
-    window.showSaveFilePicker({
-      suggestedName: filename,
-      types: [{
-        description: filename.split('.').pop().toUpperCase() + ' file',
-        accept: { [mimeType.split(';')[0]]: ['.' + (filename.split('.').pop() || 'html')] }
-      }]
-    }).then(handle => handle.createWritable())
-      .then(w => w.write(blob).then(() => w.close()))
-      .then(() => toast('已保存：' + filename))
-      .catch(err => { if(err && err.name !== 'AbortError') toast('保存失败：' + (err.message||err)); });
+
+/* ===== 一键同步到公众号草稿箱（路径 A：云开发免 AppSecret） =====
+   需把本编辑器部署到云开发静态网站(https)后可用；file:// 本地双击不可用。
+   在编辑器顶部把 MP_ENV_ID 改成你的公众号云开发环境 ID 即可。 */
+const MP_ENV_ID = 'YOUR_MP_ENV_ID'; // ← 替换为公众号云开发环境 ID
+const APP_CONFIG = {
+  ENABLED: false,         // ★ 收费总开关：false=关闭收费（导出/复制免费直接用）；true=开启聚合支付 3分/次
+  // 聚合支付云函数 HTTP 触发 base，例如 https://xxxx.api.tcloudbase.com（开启收费后必填）
+  CLOUD_API_BASE: 'YOUR_CLOUD_API_BASE',
+  PRICE: 0.03,            // 单次付费金额（元）：导出 / 一键复制 各 3 分
+  PAY_TYPE: 'wxpay'       // 默认渠道：wxpay / alipay
+};
+let _tcbApp = null;
+function getTcbApp(){
+  if(_tcbApp) return Promise.resolve(_tcbApp);
+  if(typeof cloudbase === 'undefined'){
+    return Promise.reject(new Error('未加载云开发 SDK'));
+  }
+  const app = cloudbase.init({ env: MP_ENV_ID });
+  /* 尝试匿名登录（云环境需在控制台开启「匿名登录」）；
+     若云函数已配置「允许未登录调用」则可省略，这里失败也继续尝试调用 */
+  return app.auth().signInAnonymously()
+    .then(()=>{ _tcbApp = app; return app; })
+    .catch(()=>{ _tcbApp = app; return app; });
+}
+function syncToMp(){
+  if(location.protocol !== 'https:'){
+    toast('「同步到公众号」需把本编辑器部署到云开发静态网站(https)后使用');
     return;
   }
-  /* 方案B：data URL 回退 —— 不用 blob:，避免被 Windows 弹「打开 blob 应用」错误 */
+  if(!MP_ENV_ID || MP_ENV_ID === 'YOUR_MP_ENV_ID'){
+    toast('请先在编辑器中填好公众号云开发环境 ID（MP_ENV_ID）');
+    return;
+  }
+  if(!blocks.length){ toast('还没有内容，先添加组件或用智能排版'); return; }
+  toast('正在同步到公众号草稿箱…');
+  const title = document.getElementById('docTitle').value || '公众号文章';
+  const content = exportHTML();
+  getTcbApp()
+    .then(app => app.callFunction({ name: 'syncDraft', data: { title, content } }))
+    .then(r => {
+      const d = (r && r.result) || {};
+      if(d.errcode && d.errcode !== 0){
+        toast('同步失败：' + (d.errmsg || '未知错误'));
+      } else {
+        toast('✅ 已同步到草稿箱！去公众号后台「草稿箱」即可看到');
+      }
+    })
+    .catch(e => toast('同步失败：' + (e && e.message ? e.message : e)));
+}
+document.getElementById('btnSyncMp').onclick = syncToMp;
+/* ============ 聚合支付付费闸门（导出 / 一键复制 各 3 分/次）============
+   依赖云函数 createOrder / notify / getResult（见仓库 cloudfunctions/ 与支付部署说明）。
+   部署时把 APP_CONFIG.CLOUD_API_BASE 改成你的云函数 HTTP 触发 base。 */
+const paidActions = {};   // 本会话已付费的动作，避免重复扣费
+let _payTimer = null;
+function _payPost(url, body){
+  return fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }).then(r=> r.json());
+}
+function ensurePaid(action, onPaid){
+  /* 收费总开关关闭时直接放行，导出/复制免费可用 */
+  if(!APP_CONFIG || !APP_CONFIG.ENABLED){ onPaid(); return; }
+  if(paidActions[action]){ onPaid(); return; }
+  _startPay(action, onPaid);
+}
+function _startPay(action, onPaid){
+  const c = APP_CONFIG || {};
+  if(!c.CLOUD_API_BASE || c.CLOUD_API_BASE === 'YOUR_CLOUD_API_BASE'){
+    toast('未配置支付地址（APP_CONFIG.CLOUD_API_BASE），无法发起支付');
+    return;
+  }
+  _openPayModal(action);
+  _setPayStatus('正在创建订单…','wait');
+  _payPost(c.CLOUD_API_BASE.replace(/\/$/,'') + '/createOrder', { action: action, amount: c.PRICE, type: c.PAY_TYPE || 'wxpay' })
+    .then(res=>{
+      if(!res || !res.orderId){ throw new Error((res && res.error) ? res.error : '下单失败'); }
+      _showQR(res); _payPoll(res.orderId, action, onPaid);
+    })
+    .catch(err=>{ _setPayErr(err.message || '下单异常'); _setPayStatus('支付未能发起','wait'); });
+}
+function _showQR(res){
+  _setPayStatus('等待支付…','wait'); _setPayErr('');
+  const qr = document.getElementById('payQr'), url = document.getElementById('payUrl');
+  if(res.qrcode){ qr.src = res.qrcode; qr.style.display = 'block'; } else { qr.style.display = 'none'; }
+  if(res.payurl){ url.href = res.payurl; url.textContent = '或点此在浏览器打开支付'; url.style.display = 'inline-block'; } else { url.style.display = 'none'; }
+}
+function _payPoll(orderId, action, onPaid){
+  const c = APP_CONFIG || {};
+  if(_payPoll) clearInterval(_payPoll);
+  _payPoll = setInterval(()=>{
+    _payPost(c.CLOUD_API_BASE.replace(/\/$/,'') + '/getResult', { orderId: orderId }).then(res=>{
+      if(res && res.paid){
+        clearInterval(_payPoll); _payPoll = null;
+        paidActions[action] = true;
+        _setPayStatus('支付成功 ✓','ok');
+        setTimeout(()=>{ _closePayModal(); onPaid(); }, 600);
+      }
+    }).catch(()=>{ /* 忽略轮询错误，继续 */ });
+  }, 2000);
+}
+function _openPayModal(action){
+  document.getElementById('payTitle').textContent = (action === 'export' ? '导出 HTML' : '一键复制') + ' 需支付';
+  document.getElementById('payAmount').textContent = '¥' + ((APP_CONFIG && APP_CONFIG.PRICE) || 0.03).toFixed(2);
+  document.getElementById('payErr').textContent = '';
+  document.getElementById('payMask').classList.add('show');
+}
+function _closePayModal(){
+  if(_payPoll){ clearInterval(_payPoll); _payPoll = null; }
+  document.getElementById('payMask').classList.remove('show');
+}
+function _setPayStatus(text, cls){ const el = document.getElementById('payStatus'); el.textContent = text; el.className = 'status ' + (cls || 'wait'); }
+function _setPayErr(text){ document.getElementById('payErr').textContent = text || ''; }
+document.getElementById('payClose').addEventListener('click', _closePayModal);
+document.getElementById('payMask').addEventListener('click', e=>{ if(e.target.id === 'payMask') _closePayModal(); });
+/* 触发浏览器原生"保存"对话框（最稳的 file:// 下载方式） */
+/* 方案B/C：data URL 回退 + 新窗口兜底（不用 blob:，避免被 Windows 弹「打开 blob 应用」错误） */
+function dataUrlDownload(filename, content, mimeType){
   try{
     const url = 'data:' + mimeType + ',' + encodeURIComponent(content);
     const a = document.createElement('a');
@@ -919,7 +1136,6 @@ function downloadFile(filename, content, mime){
     setTimeout(()=>{ try{ document.body.removeChild(a); }catch(e){} }, 2000);
     toast('已下载：' + filename);
   }catch(e){
-    /* 方案C：新增窗口兜底，让用户 Ctrl+S */
     const win = window.open('', '_blank');
     if(win){
       win.document.write('<!DOCTYPE html><meta charset="utf-8"><title>' + filename + '</title><pre style="white-space:pre-wrap;word-break:break-all;">' + (content.replace(/</g,'&lt;')) + '</pre>');
@@ -931,14 +1147,49 @@ function downloadFile(filename, content, mime){
   }
 }
 
-document.getElementById('btnExport').onclick = ()=>{
-  if(!blocks.length){ toast('还没有内容，先添加组件或用智能排版'); return; }
+function downloadFile(filename, content, mime){
+  const mimeType = mime || 'text/html;charset=utf-8';
+  /* 方案A：原生「另存为」对话框 —— 仅 https/localhost 可靠。
+     注意：file:// 源下浏览器虽暴露 showSaveFilePicker，但随后的 handle.createWritable()
+     会被拒绝（"The request is not allowed by the user agent or the platform"），
+     故 file:// 直接跳过 picker，走稳定的 data URL 下载，避免弹错。 */
+  if(window.showSaveFilePicker && location.protocol !== 'file:'){
+    try{
+      const blob = new Blob([content], {type: mimeType});
+      window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: filename.split('.').pop().toUpperCase() + ' file',
+          accept: { [mimeType.split(';')[0]]: ['.' + (filename.split('.').pop() || 'html')] }
+        }]
+      }).then(handle => handle.createWritable())
+        .then(w => w.write(blob).then(() => w.close()))
+        .then(() => toast('已保存：' + filename))
+        .catch(err => {
+          if(err && err.name === 'AbortError') return;        // 用户取消 → 静默，不报错
+          dataUrlDownload(filename, content, mimeType);        // 其它失败（被拦截/权限等）→ 回落 data URL
+        });
+      return;
+    }catch(e){
+      dataUrlDownload(filename, content, mimeType);            // 同步异常（如非安全上下文被禁）→ 回落
+      return;
+    }
+  }
+  /* 无 picker 时直接走 data URL 回退 */
+  dataUrlDownload(filename, content, mimeType);
+}
+
+function doExport(){
   document.getElementById('expCode').textContent = exportHTML();
   document.getElementById('expMask').classList.add('show');
   /* 同时直接触发保存对话框（用户手势内，浏览器允许弹出） */
   const fn = (document.getElementById('docTitle').value || 'wechat-article') + '.html';
   downloadFile(fn, buildFullDoc(exportHTML()), 'text/html;charset=utf-8');
   toast('已弹出保存对话框：' + fn);
+}
+document.getElementById('btnExport').onclick = ()=>{
+  if(!blocks.length){ toast('还没有内容，先添加组件或用智能排版'); return; }
+  ensurePaid('export', doExport);
 };
 document.getElementById('btnPreview').onclick = ()=>{
   if(!blocks.length){ toast('还没有内容，先添加组件或用智能排版'); return; }
@@ -1062,12 +1313,14 @@ document.getElementById('btnExportMd').onclick = ()=>{
 /* 导出浮层按钮 */
 document.getElementById('expClose').onclick = ()=> document.getElementById('expMask').classList.remove('show');
 document.getElementById('expCopy').onclick = ()=>{
-  navigator.clipboard.writeText(exportHTML()).then(()=> toast('已复制纯内联 HTML ✓')).catch(()=> toast('复制失败，请手动选择代码'));
+  copyText(exportHTML()).then(()=> toast('已复制 HTML 源码 ✓ 手动处理时用这个')).catch(()=> toast('复制失败，请手动选择代码'));
 };
 document.getElementById('expDl').onclick = ()=>{
-  const fn = (document.getElementById('docTitle').value || 'wechat-article') + '.html';
-  downloadFile(fn, buildFullDoc(exportHTML()), 'text/html;charset=utf-8');
-  toast('已弹出保存对话框：' + fn);
+  ensurePaid('export', ()=>{
+    const fn = (document.getElementById('docTitle').value || 'wechat-article') + '.html';
+    downloadFile(fn, buildFullDoc(exportHTML()), 'text/html;charset=utf-8');
+    toast('已弹出保存对话框：' + fn);
+  });
 };
 /* 点击遮罩关闭浮层 */
 document.getElementById('expMask').addEventListener('click', e=>{ if(e.target===document.getElementById('expMask')) document.getElementById('expMask').classList.remove('show'); });
@@ -1283,5 +1536,6 @@ if(load()){
   fullRender();
 }
 </script>
+<script src="https://tcb.cloud.tencent.com/cloudbase/js-sdk/index.js"></script>
 </body>
 </html>
